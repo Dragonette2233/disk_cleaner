@@ -1,0 +1,10 @@
+cx_Freeze==7.2.4
+cx_Logging==3.2.1
+lief==0.15.1
+packaging==24.1
+psutil==6.1.0
+PyQt5==5.15.11
+PyQt5-Qt5==5.15.2
+PyQt5_sip==12.15.0
+pywin32==308
+setuptools==75.3.0
