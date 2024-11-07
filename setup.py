@@ -1,29 +1,55 @@
-import sys
-from cx_Freeze import setup, Executable
-import os
+"""A simple setup script to create an executable using PyQt5. This also
+demonstrates the method for creating a Windows executable that does not have
+an associated console.
 
-# Определите имя вашего основного скрипта
-script_name = "main.py"
+test_pyqt5.py is a very simple type of PyQt5 application
 
-# Определите зависимости (если у вас есть дополнительные модули, которые нужно включить)
+Run the build process by running the command 'python setup.py build'
+
+If everything works well you should find a subdirectory in the build
+subdirectory that contains the files needed to run the application
+"""
+
+from __future__ import annotations
+
+from cx_Freeze import Executable, setup
+
+try:
+    from cx_Freeze.hooks import get_qt_plugins_paths
+except ImportError:
+    get_qt_plugins_paths = None
+
+include_files = []
+if get_qt_plugins_paths:
+    # Inclusion of extra plugins (since cx_Freeze 6.8b2)
+    # cx_Freeze automatically imports the following plugins depending on the
+    # module used, but suppose we need the following:
+    include_files += get_qt_plugins_paths("PyQt5", "multimedia")
+
 build_exe_options = {
-    "packages": ["ctypes", 'PyQt5'],
-    "includes": [],
+    # exclude packages that are not really needed
+    "excludes": ["tkinter", "unittest", "email", "http", "xml", "pydoc"],
+    "include_files": include_files,
 }
 
-# Укажите необходимые QML файлы
-include_files = []
-qml_path = os.path.join(os.path.dirname(PyQt5.__file__), 'Qt', 'qml')
+bdist_mac_options = {
+    "bundle_name": "Test",
+}
 
-# Укажите дополнительные параметры, если нужно
-base = None
-# if sys.platform == "win32":
-#     base = "Win32GUI"  # Используйте "Win32GUI" для GUI приложений без консольного окна
+bdist_dmg_options = {
+    "volume_label": "TEST",
+}
+
+executables = [Executable("main.py", base="gui")]
 
 setup(
-    name="DiskInfo",
-    version="0.1",
-    description="Disk Information Viewer",
-    options={"build_exe": build_exe_options},
-    executables=[Executable(script_name, base=base)],
+    name="Disk-Cleaner",
+    version="1.0",
+    description="Disk Cleaner with diskpart integrated",
+    options={
+        "build_exe": build_exe_options,
+       #  "bdist_mac": bdist_mac_options,
+       #  "bdist_dmg": bdist_dmg_options,
+    },
+    executables=executables,
 )
