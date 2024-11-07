@@ -1,4 +1,6 @@
 import ctypes
+import subprocess
+from dpart import DiskPartSession
 from ctypes import wintypes, byref
 
 # Определения констант
@@ -9,6 +11,8 @@ FILE_SHARE_WRITE = 0x00000002
 OPEN_EXISTING = 0x00000003
 IOCTL_STORAGE_QUERY_PROPERTY = 0x2D1400
 IOCTL_DISK_DELETE_DRIVE_LAYOUT = 0x0007C0F4
+
+dpart_session = DiskPartSession()
 
 # Определение структуры для запроса свойств хранения
 class STORAGE_PROPERTY_QUERY(ctypes.Structure):
@@ -115,7 +119,7 @@ def get_disk_info(disk_index):
     if descriptor.SerialNumberOffset:
         serial = buffer[descriptor.SerialNumberOffset:].split(b'\x00', 1)[0].decode()
 
-    return model, serial
+    return disk_index, model, serial
 
 def get_partition_count(disk_index):
     """Проверяет наличие разделов на диске."""
@@ -156,27 +160,48 @@ def get_partition_count(disk_index):
         return False  # Не удалось получить информацию о разметке
 
     # Если у нас есть разделы, их количество больше нуля
-    print(layout_info.PartitionCount)
+    # print(layout_info.PartitionCount)
     return layout_info.PartitionCount > 0
 
-def delete_disk_partitions(d):
-    # def delete_disk_partitions(disk_index):
-    return ''
-    handle = open_disk(d)
-    try:
-        result = kernel32.DeviceIoControl(
-            handle,
-            IOCTL_DISK_DELETE_DRIVE_LAYOUT,
-            None,
-            0,
-            None,
-            0,
-            ctypes.byref(wintypes.DWORD()),
-            None
-        )
-        if not result:
-            raise ctypes.WinError(ctypes.get_last_error())
-    finally:
-        kernel32.CloseHandle(handle)
+def delete_disk_partitions(disk_index):
+    
+    commands = '\n'.join(
+        [f"""
+    sel dis {i}
+    online dis
+    clean
+    """ for i in disk_index ]
+    )
+    
+    process = subprocess.Popen(
+        ["diskpart"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        shell=True
+    )
+    # Отправляем команды diskpart и получаем вывод
+    stdout, stderr = process.communicate(commands)
+    
+    # Обрабатываем результат
+    
+    all_stdout = stdout.split('DISKPART>')
+    
+    print(all_stdout)
+    
+    if process.returncode == 0:
+        if "очистка диска выполнена успешно" in stdout:
+            print("Разделы успешно удалены.")
+            return True
+        else:
+            print("Команда выполнена, но не удалось удалить разделы.")
+            return False
+    else:
+        print("Ошибка:", stderr)
+        return False
+
+
+# № вернемся к этому коду, нужно чтобы ничего не отображалось в консоль
 
     
