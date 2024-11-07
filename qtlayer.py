@@ -5,10 +5,13 @@ from PyQt5.QtWidgets import (
     QHBoxLayout, QPushButton, 
     QCheckBox, QSizePolicy, 
     QSpacerItem)
+import threading
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIcon
 import sys
+import time
 from diskutils import get_disk_info, get_partition_count, delete_disk_partitions  # Импортируем функцию для получения информации о дисках
+
 
 class DiskApp(QWidget):
     def __init__(self):
@@ -63,11 +66,19 @@ class DiskApp(QWidget):
 
         # Запускаем таймер для обновления информации каждые 2 секунды
         self.timer = QTimer()
+        self.thr_timer = QTimer()
+        self.thr_timer.timeout.connect(lambda: None)
         self.timer.timeout.connect(self.refresh_disk_info)
 
         # Первая инициализация информации о дисках
         self.connected_drives_cache = 0
+        
+        # import time
+        
+        # start = time.time()
         self.refresh_disk_info()
+        
+        # print(time.time() - start)
         
 
     def _configure_markers_info(self):
@@ -105,7 +116,7 @@ class DiskApp(QWidget):
     
     def enable_refresh(self):
         if not self.timer.isActive():
-            self.timer.start(2000)  # Обновление каждые 2000 миллисекунд (2 секунды)
+            self.timer.start(1000)  # Обновление каждые 2000 миллисекунд (2 секунды)
             self.refresh_button.setStyleSheet("color: #41C871;")
         else:
             self.refresh_button.setStyleSheet("color: #FFFFFF;")
@@ -128,6 +139,7 @@ class DiskApp(QWidget):
         if connected_drives != self.connected_drives_cache:
             self.disk_list.clear()
             print('lst of drives updated')
+            # start = time.time()
             for i, model, serial in disks_info:
                 item = QListWidgetItem()  # Создаем элемент списка
                 widget = QWidget()  # Создаем виджет для элемента
@@ -190,6 +202,7 @@ class DiskApp(QWidget):
                 self.disk_list.setItemWidget(item, widget)  # Устанавливаем виджет для элемента
                 
                 self.connected_drives_cache = connected_drives
+            # print(time.time() - start)
         else:
             print('no updates')
 
@@ -203,11 +216,21 @@ class DiskApp(QWidget):
                 # delete_disk_partitions(index)
                 selected_indices.append(index)  # Добавляем индекс выделенного элемента
 
-        # Здесь можно выполнить нужные действия с выделенными индексами
+        active_thread: threading.Thread = None
         if selected_indices:
-            delete_disk_partitions(selected_indices)
+            active_thread = threading.Thread(target=delete_disk_partitions, args=(selected_indices, ))
+            active_thread.start()
+            # delete_disk_partitions(selected_indices)
             print("Selected partitions to clear:", selected_indices)
-
+        
+        
+        # while active_thread.is_alive():
+        #     print('in process')
+        #     self.thr_timer.start(250)
+        
+        # self.thr_timer.stop()
+        # print('thr end')
+            
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = DiskApp()
