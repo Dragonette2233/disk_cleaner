@@ -128,7 +128,7 @@ class DiskApp(QWidget):
         
         if connected_drives != self.connected_drives_cache:
             self.disk_list.clear()
-            print('lst of drives updated')
+            # print('lst of drives updated')
             # start = time.time()
             for i, model, serial in disks_info:
                 item = QListWidgetItem()  # Создаем элемент списка
@@ -193,8 +193,8 @@ class DiskApp(QWidget):
                 
                 self.connected_drives_cache = connected_drives
             # print(time.time() - start)
-        else:
-            print('no updates')
+        # else:
+        #     print('no updates')
 
     def clear_selected_partitions(self):
         selected_indices = []  # Список для хранения индексов выделенных элементов
