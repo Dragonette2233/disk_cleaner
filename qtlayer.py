@@ -66,6 +66,7 @@ class DiskApp(QWidget):
 
         # Первая инициализация информации о дисках
         self.connected_drives_cache = 0
+        self.partition_sequence = ''
         self.refresh_disk_info()
 
     def _configure_markers_info(self):
@@ -121,17 +122,31 @@ class DiskApp(QWidget):
         
         for i in range(10):  # Предположим, проверяем до 10 дисков
             info = get_disk_info(i)  # Получаем информацию о диске
+            # partition_info = get_partition_count(i)
             if info:
                 disks_info.append(info)  # Извлекаем модель и серийный номер
                 connected_drives += 1
             else:
-                disks_info.append((i, "Not connected", ""))  # Если диск не подключен
+                disks_info.append((i, "Not connected", "", "UL"))  # Если диск не подключен
         
-        if connected_drives != self.connected_drives_cache:
+        part_sequence = ''.join(i[3] for i in disks_info)
+        # print(part_sequence)
+        refresh_require = [
+            self.partition_sequence != part_sequence,
+            self.connected_drives_cache != connected_drives
+        ]
+
+
+        if any(refresh_require):
+            self.connected_drives_cache = connected_drives
+            self.partition_sequence = part_sequence
             self.disk_list.clear()
             # print('lst of drives updated')
             # start = time.time()
-            for i, model, serial in disks_info:
+            for i, model, serial, p_info in disks_info:
+                
+                # Метка для кружка
+                # p_info = get_partition_count(i
                 item = QListWidgetItem()  # Создаем элемент списка
                 widget = QWidget()  # Создаем виджет для элемента
                 h_layout = QHBoxLayout()  # Горизонтальный компоновщик
@@ -146,8 +161,10 @@ class DiskApp(QWidget):
                 # d_index = QLabel(str(i))
                 # d_index.setStyleSheet("color: white;")  # Устанавливаем цвет текста метки индекса
 
-                # Метка для кружка
-                p_info = get_partition_count(i)
+
+
+
+                # self.clear_partition_states[i] = p_info
                 match p_info, model:
                     case 'UL' | 'NL', 'Not connected':
                         cclr = 'red'

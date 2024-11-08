@@ -124,8 +124,11 @@ def get_disk_info(disk_index):
         model = buffer[descriptor.ProductIdOffset:].split(b'\x00', 1)[0].decode()
     if descriptor.SerialNumberOffset:
         serial = buffer[descriptor.SerialNumberOffset:].split(b'\x00', 1)[0].decode()
+
+    partition_info = get_partition_count(disk_index)
+
     # print(model, serial)
-    return disk_index, model, serial
+    return disk_index, model, serial, partition_info
 
 def get_partition_count(disk_number):
     # def get_drive_layout(disk_number):
