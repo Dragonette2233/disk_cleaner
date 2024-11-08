@@ -1,5 +1,6 @@
 import ctypes
 from ctypes import wintypes, byref
+import subprocess
 
 # Определения констант
 GENERIC_READ = 0x80000000
@@ -124,7 +125,7 @@ def get_disk_info(disk_index):
     if descriptor.SerialNumberOffset:
         serial = buffer[descriptor.SerialNumberOffset:].split(b'\x00', 1)[0].decode()
     # print(model, serial)
-    return model, serial
+    return disk_index, model, serial
 
 def get_partition_count(disk_number):
     # def get_drive_layout(disk_number):
@@ -175,53 +176,41 @@ def get_partition_count(disk_number):
         return 'NL'
 
 def delete_disk_partitions(disk_index):
-    """Удаление разметки диска с помощью IOCTL_DISK_DELETE_DRIVE_LAYOUT."""
-    handle = open_disk(disk_index)
-    bytes_returned = wintypes.DWORD(0)
     
-    try:
-        result = kernel32.DeviceIoControl(
-            handle,
-            IOCTL_DISK_DELETE_DRIVE_LAYOUT,
-            None,
-            0,
-            None,
-            0,
-            ctypes.byref(bytes_returned),
-            None
-        )
-        print(result)
-        if not result:
-            raise ctypes.WinError()
-        print(f"Разделы на диске {disk_index} успешно удалены.")
-    except OSError as e:
-        if e.winerror == 5:  # Ошибка доступа
-            print("Ошибка доступа (winerror 5). Запустите скрипт с правами администратора.")
+    commands = '\n'.join(
+        [f"""
+    sel dis {i}
+    online dis
+    clean
+    """ for i in disk_index ]
+    )
+    
+    process = subprocess.Popen(
+        ["diskpart"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        shell=True
+    )
+    # Отправляем команды diskpart и получаем вывод
+    stdout, stderr = process.communicate(commands)
+    
+    # Обрабатываем результат
+    
+    all_stdout = stdout.split('DISKPART>')
+    
+    # print(all_stdout)
+    
+    if process.returncode == 0:
+        if "очистка диска выполнена успешно" in stdout:
+            print("Разделы успешно удалены.")
+            return True
         else:
-            print(f"Ошибка: {e}")
-    finally:
-        kernel32.CloseHandle(handle)
-
-# def delete_disk_partitions(d):
-#     # def delete_disk_partitions(disk_index):
-#     # print('cl')
-#     # return ''
-#     handle = open_disk(d)
-#     try:
-#         result = kernel32.DeviceIoControl(
-#             handle,
-#             IOCTL_DISK_DELETE_DRIVE_LAYOUT,
-#             None,
-#             0,
-#             None,
-#             0,
-#             ctypes.byref(wintypes.DWORD()),
-#             None
-#         )
-#         if not result:
-#             # print(result)
-#             raise ctypes.WinError(ctypes.get_last_error())
-#     finally:
-#         kernel32.CloseHandle(handle)
+            print("Команда выполнена, но не удалось удалить разделы.")
+            return False
+    else:
+        print("Ошибка:", stderr)
+        return False
 
     

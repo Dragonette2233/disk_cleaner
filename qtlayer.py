@@ -64,6 +64,7 @@ class DiskApp(QWidget):
         self.timer.timeout.connect(self.refresh_disk_info)
 
         # Первая инициализация информации о дисках
+        self.connected_drives_cache = 0
         self.refresh_disk_info()
 
     def _configure_markers_info(self):
@@ -105,81 +106,95 @@ class DiskApp(QWidget):
     
     def enable_refresh(self):
         if not self.timer.isActive():
-            self.timer.start(2000)  # Обновление каждые 2000 миллисекунд (2 секунды)
+            self.timer.start(1000)  # Обновление каждые 2000 миллисекунд (2 секунды)
             self.refresh_button.setStyleSheet("color: #41C871;")
         else:
             self.refresh_button.setStyleSheet("color: #FFFFFF;")
             self.timer.stop()
         
     def refresh_disk_info(self):
-        self.disk_list.clear()  # Очищаем список перед обновлением
+        # self.disk_list.clear()  # Очищаем список перед обновлением
+        connected_drives = 0
+        disks_info = []
+        
+        
         for i in range(10):  # Предположим, проверяем до 10 дисков
             info = get_disk_info(i)  # Получаем информацию о диске
             if info:
-                model, serial = info  # Извлекаем модель и серийный номер
+                disks_info.append(info)  # Извлекаем модель и серийный номер
+                connected_drives += 1
             else:
-                model, serial = "Not connected", ""  # Если диск не подключен
+                disks_info.append((i, "Not connected", ""))  # Если диск не подключен
+        
+        if connected_drives != self.connected_drives_cache:
+            self.disk_list.clear()
+            print('lst of drives updated')
+            # start = time.time()
+            for i, model, serial in disks_info:
+                item = QListWidgetItem()  # Создаем элемент списка
+                widget = QWidget()  # Создаем виджет для элемента
+                h_layout = QHBoxLayout()  # Горизонтальный компоновщик
 
-            item = QListWidgetItem()  # Создаем элемент списка
-            widget = QWidget()  # Создаем виджет для элемента
-            h_layout = QHBoxLayout()  # Горизонтальный компоновщик
+                # Чекбокс для выбора диска
+                checkbox = QCheckBox()
+                checkbox.setFixedSize(20, 20)
+                checkbox.setChecked(True if i != 0 else False)  # Устанавливаем состояние чекбокса
+                checkbox.setStyleSheet("text-align: end;")  # Устанавливаем цвет текста чекбокса
 
-            # Чекбокс для выбора диска
-            checkbox = QCheckBox()
-            checkbox.setFixedSize(20, 20)
-            checkbox.setChecked(True if i != 0 else False)  # Устанавливаем состояние чекбокса
-            checkbox.setStyleSheet("text-align: end;")  # Устанавливаем цвет текста чекбокса
+                # Создаем метку для индекса
+                # d_index = QLabel(str(i))
+                # d_index.setStyleSheet("color: white;")  # Устанавливаем цвет текста метки индекса
 
-            # Создаем метку для индекса
-            # d_index = QLabel(str(i))
-            # d_index.setStyleSheet("color: white;")  # Устанавливаем цвет текста метки индекса
-
-            # Метка для кружка
-            # print(get_partition_count(i)
-            cnt = get_partition_count(i)
-            match cnt, model:
-                case 'NL' | 'UL', 'Not connected':
-                    cclr = 'red'
-                case 'EL', model:
-                    cclr = 'yellow'
-                case 'NL', model:
-                    cclr = 'green'
-                case 'UL', model:
-                    print(cnt, model)
-                    cclr = 'grey'
+                # Метка для кружка
+                p_info = get_partition_count(i)
+                match p_info, model:
+                    case 'UL' | 'NL', 'Not connected':
+                        cclr = 'red'
+                    case 'EL', model:
+                        cclr = 'yellow'
+                    case 'NL', model:
+                        cclr = 'green'
+                    case _:
+                        print(p_info, model)
+                        cclr = 'grey'
+                    
                 
-            
-            
-            circle = self._colored_marker(color=cclr)
-            # circle = QLabel()
-            # circle.setFixedSize(15, 15)  # Устанавливаем размер кружка
-            # circle.setStyleSheet("background-color: %s; border-radius: 7.5px;" % cclr)
-            
-            # Создаем метку для модели
-            model_label = QLabel(f"[{i}] " + model)
-            clr_m = "red" if model == 'Not connected' else '#27C4E2'
-            model_label.setStyleSheet("color: %s;" % clr_m)  # Установка цвета для модели
+                
+                circle = self._colored_marker(color=cclr)
+                # circle = QLabel()
+                # circle.setFixedSize(15, 15)  # Устанавливаем размер кружка
+                # circle.setStyleSheet("background-color: %s; border-radius: 7.5px;" % cclr)
+                
+                # Создаем метку для модели
+                model_label = QLabel(f"[{i}] " + model)
+                clr_m = "red" if model == 'Not connected' else '#27C4E2'
+                model_label.setStyleSheet("color: %s;" % clr_m)  # Установка цвета для модели
 
-            # Создаем метку для серийного номера
-            serial_label = QLabel("S/N: " + serial.strip())
-            serial_label.setStyleSheet("color: green;")  # Установка цвета для серийного номера
-            
-            # Добавляем виджеты в горизонтальный компоновщик
-            h_layout.addWidget(circle)
-            h_layout.addWidget(model_label)
-            h_layout.addWidget(serial_label)
-            # h_layout.addSpacerItem(QSpacerItem(40, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
-            h_layout.addWidget(checkbox)
-            
-            
-            h_layout.setSpacing(1)  # Задайте нужное расстояние в пикселях
-            # h_layout.setAlignment()
-            h_layout.setContentsMargins(0, 0, 0, 0)  # Убираем отступы
+                # Создаем метку для серийного номера
+                serial_label = QLabel("S/N: " + serial.strip())
+                serial_label.setStyleSheet("color: green;")  # Установка цвета для серийного номера
+                
+                # Добавляем виджеты в горизонтальный компоновщик
+                h_layout.addWidget(circle)
+                h_layout.addWidget(model_label)
+                h_layout.addWidget(serial_label)
+                # h_layout.addSpacerItem(QSpacerItem(40, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
+                h_layout.addWidget(checkbox)
+                
+                
+                h_layout.setSpacing(1)  # Задайте нужное расстояние в пикселях
+                # h_layout.setAlignment()
+                h_layout.setContentsMargins(0, 0, 0, 0)  # Убираем отступы
 
-            widget.setLayout(h_layout)  # Устанавливаем компоновщик для виджета
-            item.setSizeHint(widget.sizeHint())  # Устанавливаем размер элемента
-            self.disk_list.addItem(item)  # Добавляем элемент в QListWidget
-            self.disk_list.setItemWidget(item, widget)  # Устанавливаем виджет для элемента
+                widget.setLayout(h_layout)  # Устанавливаем компоновщик для виджета
+                item.setSizeHint(widget.sizeHint())  # Устанавливаем размер элемента
+                self.disk_list.addItem(item)  # Добавляем элемент в QListWidget
+                self.disk_list.setItemWidget(item, widget)  # Устанавливаем виджет для элемента
+                
+                self.connected_drives_cache = connected_drives
+            # print(time.time() - start)
+        else:
+            print('no updates')
 
     def clear_selected_partitions(self):
         selected_indices = []  # Список для хранения индексов выделенных элементов
