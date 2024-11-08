@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout, QPushButton, 
     QCheckBox, QSizePolicy, 
     QSpacerItem)
+import threading
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIcon
 import sys
@@ -203,12 +204,15 @@ class DiskApp(QWidget):
             widget = self.disk_list.itemWidget(item)  # Получаем виджет для элемента
             checkbox = widget.findChild(QCheckBox)  # Находим чекбокс в виджете
             if checkbox.isChecked():
-                delete_disk_partitions(index)
-                # selected_indices.append(index)  # Добавляем индекс выделенного элемента
+                # delete_disk_partitions(index)
+                selected_indices.append(index)  # Добавляем индекс выделенного элемента
 
-        # Здесь можно выполнить нужные действия с выделенными индексами
-        # if selected_indices:
-        #     print("Selected partitions to clear:", selected_indices)
+        active_thread: threading.Thread = None
+        if selected_indices:
+            active_thread = threading.Thread(target=delete_disk_partitions, args=(selected_indices, ))
+            active_thread.start()
+            # delete_disk_partitions(selected_indices)
+            print("Selected partitions to clear:", selected_indices)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
