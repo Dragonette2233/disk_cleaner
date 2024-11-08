@@ -1,5 +1,6 @@
 import sys
 from cx_Freeze import setup, Executable
+import PyQt5
 import os
 
 # Определите имя вашего основного скрипта

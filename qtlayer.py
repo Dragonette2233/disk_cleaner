@@ -13,8 +13,6 @@ from diskutils import get_disk_info, get_partition_count, delete_disk_partitions
 class DiskApp(QWidget):
     def __init__(self):
         super().__init__()
-
-        self.setWindowIcon(QIcon('dsp.ico'))
         # Создаем основной компоновщик
         self.layout = QVBoxLayout()
         # self.layout.setContentsMargins(2, 5, 5, 5)  # Убираем отступы
@@ -48,7 +46,7 @@ class DiskApp(QWidget):
         self.setLayout(self.layout)
 
         # Устанавливаем заголовок и размеры окна
-        self.setWindowTitle("DSP-Disk-Cleaner")
+        self.setWindowTitle("Disk-Layout-Cleaner")
         self.setStyleSheet("""
             QWidget {
                 background-color: #2B2F31;  /* Цвет фона */
@@ -76,6 +74,7 @@ class DiskApp(QWidget):
         green_mrk = self._colored_marker('green')
         yellow_mrk = self._colored_marker('yellow')
         red_mrk = self._colored_marker('red')
+        grey_mrk = self._colored_marker('grey')
         
         # Добавляем кружочки и текст к каждому индикатору
         h_layout.addWidget(green_mrk)
@@ -90,6 +89,9 @@ class DiskApp(QWidget):
 
         h_layout.addWidget(red_mrk)
         h_layout.addWidget(QLabel("not connected"))
+
+        h_layout.addWidget(grey_mrk)
+        h_layout.addWidget(QLabel("disk is busy"))
 
         # Добавляем компоновщик с цветными кружками и текстом в основной макет окна
         self.layout.addWidget(widget)
@@ -133,14 +135,18 @@ class DiskApp(QWidget):
             # d_index.setStyleSheet("color: white;")  # Устанавливаем цвет текста метки индекса
 
             # Метка для кружка
-            print(get_partition_count(i))
-            match get_partition_count(i), model:
-                case False, 'Not connected':
+            # print(get_partition_count(i)
+            cnt = get_partition_count(i)
+            match cnt, model:
+                case 'NL' | 'UL', 'Not connected':
                     cclr = 'red'
-                case True, model:
+                case 'EL', model:
                     cclr = 'yellow'
-                case False, model:
+                case 'NL', model:
                     cclr = 'green'
+                case 'UL', model:
+                    print(cnt, model)
+                    cclr = 'grey'
                 
             
             
@@ -186,8 +192,8 @@ class DiskApp(QWidget):
                 # selected_indices.append(index)  # Добавляем индекс выделенного элемента
 
         # Здесь можно выполнить нужные действия с выделенными индексами
-        if selected_indices:
-            print("Selected partitions to clear:", selected_indices)
+        # if selected_indices:
+        #     print("Selected partitions to clear:", selected_indices)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
