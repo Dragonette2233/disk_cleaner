@@ -173,6 +173,9 @@ def get_partition_count(disk_number):
 
     # Вывод информации о каждом разделе
     # print(f"Информация о диске PhysicalDrive{disk_number}:")
+    # print(layout.PartitionCount)
+    # print(layout.DriveLayoutInformation[0:])
+    # print(layout.PartitionStyle)
     if layout.PartitionCount > 0:
         return 'EL'
     else:
@@ -197,23 +200,8 @@ def delete_disk_partitions(disk_index):
         shell=True
     )
     # Отправляем команды diskpart и получаем вывод
-    stdout, stderr = process.communicate(commands)
+    process.communicate(commands)
     
-    # Обрабатываем результат
-    
-    all_stdout = stdout.split('DISKPART>')
-    
-    # print(all_stdout)
-    
-    if process.returncode == 0:
-        if "очистка диска выполнена успешно" in stdout:
-            print("Разделы успешно удалены.")
-            return True
-        else:
-            print("Команда выполнена, но не удалось удалить разделы.")
-            return False
-    else:
-        print("Ошибка:", stderr)
-        return False
+ 
 
     

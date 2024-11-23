@@ -30,6 +30,7 @@ build_exe_options = {
     # exclude packages that are not really needed
     "excludes": ["tkinter", "unittest", "email", "http", "xml", "pydoc"],
     "include_files": include_files,
+    "include_msvcr": True,
 }
 
 bdist_mac_options = {
@@ -40,7 +41,7 @@ bdist_dmg_options = {
     "volume_label": "TEST",
 }
 
-executables = [Executable("main.py", base="gui")]
+executables = [Executable("main.py", base="gui", icon="hdd.ico", target_name='dlc')]
 
 setup(
     name="Disk-Cleaner",

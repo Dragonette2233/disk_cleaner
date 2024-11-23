@@ -11,9 +11,7 @@ def run_as_admin():
             None, "runas", sys.executable, " ".join(sys.argv), None, 1
         )
         sys.exit()
-
-run_as_admin()
-
+        
 if __name__ == "__main__":
     run_as_admin()
     app = QApplication(sys.argv)
