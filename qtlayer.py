@@ -8,7 +8,8 @@ import threading
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QIcon
 import sys
-from diskutils import get_disk_info, get_partition_count, delete_disk_partitions  # Импортируем функцию для получения информации о дисках
+import diskutils as du
+# from diskutils import get_disk_info, get_partition_count, delete_disk_partitions  # Импортируем функцию для получения информации о дисках
 
 class DiskApp(QWidget):
     def __init__(self):
@@ -27,9 +28,11 @@ class DiskApp(QWidget):
         
         # Кнопка для очистки разделов
         self.clear_button = QPushButton("Clear disks partitions")
+        self.eject_button = QPushButton("Stop spindle and eject")
         self.refresh_button = QPushButton("Enable refresh")
         
         self.clear_button.clicked.connect(self.clear_selected_partitions)
+        self.eject_button.clicked.connect(self.eject_device)
         self.refresh_button.clicked.connect(self.enable_refresh)
         
  
@@ -45,6 +48,7 @@ class DiskApp(QWidget):
         self.layout.addWidget(self.disk_list)
         # self.layout.addWidget(self.green_circle_label)
         self.layout.addWidget(self.clear_button)
+        self.layout.addWidget(self.eject_button)
         self.layout.addWidget(self.refresh_button)
         self.setLayout(self.layout)
 
@@ -135,7 +139,7 @@ class DiskApp(QWidget):
         
         
         for i in range(10):  # Предположим, проверяем до 10 дисков
-            info = get_disk_info(i)  # Получаем информацию о диске
+            info = du.get_disk_info(i)  # Получаем информацию о диске
             # partition_info = get_partition_count(i)
             if info:
                 disks_info.append(info)  # Извлекаем модель и серийный номер
@@ -228,6 +232,21 @@ class DiskApp(QWidget):
         # else:
         #     print('no updates')
 
+    def eject_device(self):
+        selected_indices = []  # Список для хранения индексов выделенных элементов
+        for index in range(self.disk_list.count()):
+            item = self.disk_list.item(index)
+            widget = self.disk_list.itemWidget(item)  # Получаем виджет для элемента
+            checkbox = widget.findChild(QCheckBox)  # Находим чекбокс в виджете
+            if checkbox.isChecked():
+                # delete_disk_partitions(index)
+                selected_indices.append(index)  # Добавляем индекс выделенного элемента
+
+        if selected_indices:
+            for i in selected_indices:
+                du.stop_spindle(i)
+                du.eject_device(i)
+    
     def clear_selected_partitions(self):
         selected_indices = []  # Список для хранения индексов выделенных элементов
         for index in range(self.disk_list.count()):
@@ -239,7 +258,7 @@ class DiskApp(QWidget):
                 selected_indices.append(index)  # Добавляем индекс выделенного элемента
 
         if selected_indices:
-            self.clearing_thread = threading.Thread(target=delete_disk_partitions, args=(selected_indices, ))
+            self.clearing_thread = threading.Thread(target=du.delete_disk_partitions, args=(selected_indices, ))
             self.clearing_thread.start()
             self.clr_thr_timer.start(200)
             self.clear_button.setDisabled(True)

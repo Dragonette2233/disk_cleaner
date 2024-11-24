@@ -11,6 +11,7 @@ OPEN_EXISTING = 0x00000003
 IOCTL_STORAGE_QUERY_PROPERTY = 0x2D1400
 IOCTL_DISK_DELETE_DRIVE_LAYOUT = 0x0007C0CC
 IOCTL_DISK_GET_DRIVE_LAYOUT_EX = 0x00070050
+IOCTL_STORAGE_EJECT_MEDIA = 0x2D4808  # Остановка шпинделя
 FILE_READ_DATA = 0x0001
 OPEN_EXISTING = 3
 
@@ -66,6 +67,7 @@ class DRIVE_LAYOUT_INFORMATION_EX(ctypes.Structure):
     ]
 
 kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+cfgmgr32 = ctypes.WinDLL("cfgmgr32", use_last_error=True)
 
 # Функция для открытия диска
 def open_disk(disk_index):
@@ -79,6 +81,43 @@ def open_disk(disk_index):
         0,
         None
     )
+
+def stop_spindle(drive_index):
+    h_device = open_disk(drive_index)
+    try:
+        result = kernel32.DeviceIoControl(
+            h_device,
+            IOCTL_STORAGE_EJECT_MEDIA,
+            None,
+            0,
+            None,
+            0,
+            ctypes.byref(wintypes.DWORD(0)),
+            None,
+        )
+        if not result:
+            raise ctypes.WinError(ctypes.get_last_error())
+        print(f"Шпиндель устройства PhysicalDrive{drive_index} успешно остановлен.")
+    finally:
+        kernel32.CloseHandle(h_device)
+        
+def eject_device(drive_index):
+    # Получаем идентификатор устройства
+    device_instance_id = f"\\\\.\\PhysicalDrive{drive_index}"
+    device_instance_id_buffer = ctypes.create_unicode_buffer(device_instance_id)
+
+    # Отключаем устройство
+    result = cfgmgr32.CM_Request_Device_EjectW(
+        device_instance_id_buffer,
+        None,  # Указатель на выходной параметр (не требуется)
+        None,  # Контекст (не требуется)
+        0,     # Флаги
+        0      # Зарезервировано
+    )
+    if result == 0:
+        print(f"Устройство PhysicalDrive{drive_index} успешно отключено от системы.")
+    else:
+        raise ctypes.WinError(result)
 
 # Функция для получения модели диска и серийного номера
 def get_disk_info(disk_index):
