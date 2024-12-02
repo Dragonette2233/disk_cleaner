@@ -45,7 +45,7 @@ executables = [Executable("main.py", base="gui", icon="hdd.ico", target_name='dl
 
 setup(
     name="Disk-Cleaner",
-    version="1.0",
+    version="1.15",
     description="Disk Cleaner with diskpart integrated",
     options={
         "build_exe": build_exe_options,

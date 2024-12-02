@@ -1,5 +1,6 @@
 import ctypes
 from ctypes import wintypes, byref
+import queue
 import subprocess
 
 # Определения констант
@@ -14,6 +15,8 @@ IOCTL_DISK_GET_DRIVE_LAYOUT_EX = 0x00070050
 IOCTL_STORAGE_EJECT_MEDIA = 0x2D4808  # Остановка шпинделя
 FILE_READ_DATA = 0x0001
 OPEN_EXISTING = 3
+
+update_queue = queue.Queue()
 
 # Определение структуры для запроса свойств хранения
 class STORAGE_PROPERTY_QUERY(ctypes.Structure):
@@ -164,8 +167,22 @@ def get_disk_info(disk_index):
     if descriptor.SerialNumberOffset:
         serial = buffer[descriptor.SerialNumberOffset:].split(b'\x00', 1)[0].decode()
 
-    partition_info = get_partition_count(disk_index)
+    partition_info: str = ''
 
+    try:
+        partition_info = get_partition_count(disk_index)
+    except OSError as e:
+        
+        s_e = str(e)
+        if 'CRC' in s_e:
+            partition_info = 'CRC'
+        elif 'ввода' in s_e:
+            partition_info = 'IO'
+        elif 'не подключено' in s_e:
+            partition_info = 'NC'
+        else:
+            partition_info = s_e
+        # print("pinfo is", partition_info)
     # print(model, serial)
     return disk_index, model, serial, partition_info
 

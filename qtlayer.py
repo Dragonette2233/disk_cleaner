@@ -17,7 +17,7 @@ class DiskApp(QWidget):
         # Создаем основной компоновщик
         self.setWindowTitle("Disk Layout Cleaner")
         self.layout = QVBoxLayout()
-        self.icon = QIcon('lib\hdd.ico')
+        self.icon = QIcon('lib\\hdd.ico')
         self.setWindowIcon(self.icon)
         # self.layout.setContentsMargins(2, 5, 5, 5)  # Убираем отступы
         
@@ -96,6 +96,8 @@ class DiskApp(QWidget):
         yellow_mrk = self._colored_marker('yellow')
         red_mrk = self._colored_marker('red')
         grey_mrk = self._colored_marker('grey')
+        orange_mrk = self._colored_marker('orange')
+        
         
         # Добавляем кружочки и текст к каждому индикатору
         h_layout.addWidget(green_mrk)
@@ -111,8 +113,16 @@ class DiskApp(QWidget):
         h_layout.addWidget(red_mrk)
         h_layout.addWidget(QLabel("not connected"))
 
+        h_layout.addSpacing(20)  # Расстояние между кружочками
+
         h_layout.addWidget(grey_mrk)
         h_layout.addWidget(QLabel("disk is busy"))
+
+        h_layout.addSpacing(20)  # Расстояние между кружочками
+
+        h_layout.addWidget(orange_mrk)
+        h_layout.addWidget(QLabel("init err "))
+
 
         # Добавляем компоновщик с цветными кружками и текстом в основной макет окна
         self.layout.addWidget(widget)
@@ -184,12 +194,18 @@ class DiskApp(QWidget):
 
                 # self.clear_partition_states[i] = p_info
                 match p_info, model:
-                    case 'UL' | 'NL', 'Not connected':
+                    case 'UL' | 'NL' | 'NC', 'Not connected':
                         cclr = 'red'
                     case 'EL', model:
                         cclr = 'yellow'
                     case 'NL', model:
                         cclr = 'green'
+                    case 'CRC' | 'IO', model:
+                        if p_info == 'CRC':
+                            model = model + ' (CRC Err)'
+                        if p_info == 'IO':
+                            model = model + ' (I/O Err)'
+                        cclr = 'orange'
                     case _:
                         print(p_info, model)
                         cclr = 'grey'
@@ -208,7 +224,7 @@ class DiskApp(QWidget):
 
                 # Создаем метку для серийного номера
                 serial_label = QLabel("S/N: " + serial.strip())
-                serial_label.setStyleSheet("color: green;")  # Установка цвета для серийного номера
+                serial_label.setStyleSheet("color: #65FA48;")  # Установка цвета для серийного номера
                 
                 # Добавляем виджеты в горизонтальный компоновщик
                 h_layout.addWidget(circle)
