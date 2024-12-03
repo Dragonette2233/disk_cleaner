@@ -13,8 +13,12 @@ IOCTL_STORAGE_QUERY_PROPERTY = 0x2D1400
 IOCTL_DISK_DELETE_DRIVE_LAYOUT = 0x0007C0CC
 IOCTL_DISK_GET_DRIVE_LAYOUT_EX = 0x00070050
 IOCTL_STORAGE_EJECT_MEDIA = 0x2D4808  # Остановка шпинделя
+IOCTL_SCSI_PASS_THROUGH_DIRECT = 0x4D014 # SCSI команды
 FILE_READ_DATA = 0x0001
 OPEN_EXISTING = 3
+
+SCSI_CDB_LENGTH = 16  # Длина CDB команды
+SENSE_BUFFER_LENGTH = 32
 
 update_queue = queue.Queue()
 
@@ -44,7 +48,22 @@ class STORAGE_DEVICE_DESCRIPTOR(ctypes.Structure):
         ("RawDeviceProperties", wintypes.BYTE * 1)
     ]
 
-
+class SCSI_PASS_THROUGH_DIRECT(ctypes.Structure):
+    _fields_ = [
+        ("Length", wintypes.USHORT),
+        ("ScsiStatus", wintypes.BYTE),
+        ("PathId", wintypes.BYTE),
+        ("TargetId", wintypes.BYTE),
+        ("Lun", wintypes.BYTE),
+        ("CdbLength", wintypes.BYTE),
+        ("SenseInfoLength", wintypes.BYTE),
+        ("DataIn", wintypes.BYTE),  # 0 = None, 1 = Data In, 2 = Data Out
+        ("DataTransferLength", wintypes.ULONG),
+        ("TimeOutValue", wintypes.ULONG),
+        ("DataBuffer", ctypes.POINTER(ctypes.c_ubyte)),
+        ("SenseInfoOffset", wintypes.ULONG),
+        ("Cdb", wintypes.BYTE * SCSI_CDB_LENGTH),
+    ]
 
 # Определение структур
 class PARTITION_INFORMATION_EX(ctypes.Structure):
@@ -86,23 +105,46 @@ def open_disk(disk_index):
     )
 
 def stop_spindle(drive_index):
-    h_device = open_disk(drive_index)
+    handle = open_disk(drive_index)
     try:
-        result = kernel32.DeviceIoControl(
-            h_device,
-            IOCTL_STORAGE_EJECT_MEDIA,
+        # Настройка структуры SCSI_PASS_THROUGH_DIRECT
+        sense_buffer = (ctypes.c_ubyte * SENSE_BUFFER_LENGTH)()
+        cdb_command = (ctypes.c_ubyte * SCSI_CDB_LENGTH)()
+        cdb_command[0] = 0x1B  # Команда SCSI START STOP UNIT
+        cdb_command[4] = 0  # Поле START (1 для START, 0 для STOP)
+
+        scsi_command = SCSI_PASS_THROUGH_DIRECT()
+        scsi_command.Length = ctypes.sizeof(SCSI_PASS_THROUGH_DIRECT)
+        scsi_command.CdbLength = 6  # Длина команды
+        scsi_command.DataIn = 0  # Данные не передаются
+        scsi_command.DataTransferLength = 0
+        scsi_command.TimeOutValue = 10  # Таймаут в секундах
+        scsi_command.DataBuffer = None
+        scsi_command.SenseInfoOffset = ctypes.addressof(sense_buffer)
+        scsi_command.Cdb = cdb_command
+
+        # Выполнение команды
+        bytes_returned = wintypes.DWORD()
+        print("Отправка команды START/STOP UNIT...")
+
+        success = kernel32.DeviceIoControl(
+            handle,
+            IOCTL_SCSI_PASS_THROUGH_DIRECT,
+            ctypes.byref(scsi_command),
+            ctypes.sizeof(scsi_command),
             None,
             0,
-            None,
-            0,
-            ctypes.byref(wintypes.DWORD(0)),
+            ctypes.byref(bytes_returned),
             None,
         )
-        if not result:
-            raise ctypes.WinError(ctypes.get_last_error())
-        print(f"Шпиндель устройства PhysicalDrive{drive_index} успешно остановлен.")
+
+        if not success:
+            raise ctypes.WinError(ctypes.get_last_error(), "Ошибка выполнения DeviceIoControl")
+
+        
+        print(f"Команда STOP UNIT успешно отправлена на диск {drive_index}.")
     finally:
-        kernel32.CloseHandle(h_device)
+        kernel32.CloseHandle(handle)
         
 def eject_device(drive_index):
     # Получаем идентификатор устройства
@@ -184,7 +226,8 @@ def get_disk_info(disk_index):
             partition_info = s_e
         # print("pinfo is", partition_info)
     # print(model, serial)
-    return disk_index, model, serial, partition_info
+    # update_queue.put([])
+    return disk_index, model, serial, partition_info 
 
 def get_partition_count(disk_number):
     # def get_drive_layout(disk_number):
@@ -237,11 +280,18 @@ def get_partition_count(disk_number):
     else:
         return 'NL'
 
-def delete_disk_partitions(disk_index):
+def delete_disk_partitions(disk_index, rescan):
+
+    rescan_command = ''
+
+    if rescan:
+        rescan_command = 'RESCAN'
+    
     
     commands = '\n'.join(
         [f"""
     sel dis {i}
+    {rescan_command}
     online dis
     clean
     """ for i in disk_index ]

@@ -6,26 +6,29 @@ GENERIC_READ = 0x80000000
 GENERIC_WRITE = 0x40000000
 FILE_SHARE_READ = 0x00000001
 FILE_SHARE_WRITE = 0x00000002
-OPEN_EXISTING = 0x3
-IOCTL_SCSI_PASS_THROUGH_DIRECT_EX = 0x4D024
+OPEN_EXISTING = 3
+IOCTL_SCSI_PASS_THROUGH_DIRECT = 0x4D014
 
 # Размеры буферов
-SCSI_CDB_LENGTH = 0x10  # 16 байт
-SENSE_BUFFER_LENGTH = 0x20  # 32 байта
+SCSI_CDB_LENGTH = 16  # Длина CDB команды
+SENSE_BUFFER_LENGTH = 32
 
-# Структура SCSI_PASS_THROUGH_DIRECT_EX
-class SCSI_PASS_THROUGH_DIRECT_EX(ctypes.Structure):
+# Структура SCSI_PASS_THROUGH_DIRECT
+class SCSI_PASS_THROUGH_DIRECT(ctypes.Structure):
     _fields_ = [
-        ("Version", wintypes.ULONG),
-        ("Length", wintypes.ULONG),
-        ("CdbLength", wintypes.CHAR),
-        ("Flags", wintypes.CHAR),
-        ("Reserved", wintypes.USHORT),
+        ("Length", wintypes.USHORT),
+        ("ScsiStatus", wintypes.BYTE),
+        ("PathId", wintypes.BYTE),
+        ("TargetId", wintypes.BYTE),
+        ("Lun", wintypes.BYTE),
+        ("CdbLength", wintypes.BYTE),
+        ("SenseInfoLength", wintypes.BYTE),
+        ("DataIn", wintypes.BYTE),  # 0 = None, 1 = Data In, 2 = Data Out
         ("DataTransferLength", wintypes.ULONG),
         ("TimeOutValue", wintypes.ULONG),
-        ("DataBufferOffset", wintypes.ULONG),
+        ("DataBuffer", ctypes.POINTER(ctypes.c_ubyte)),
         ("SenseInfoOffset", wintypes.ULONG),
-        ("Cdb", ctypes.c_ubyte * SCSI_CDB_LENGTH),
+        ("Cdb", wintypes.BYTE * SCSI_CDB_LENGTH),
     ]
 
 # Загрузка Windows API
@@ -60,7 +63,7 @@ CloseHandle = kernel32.CloseHandle
 CloseHandle.argtypes = [wintypes.HANDLE]
 CloseHandle.restype = wintypes.BOOL
 
-def send_scsi_sleep_command(drive_number):
+def send_scsi_command(drive_number, command):
     drive_path = f"\\\\.\\PhysicalDrive{drive_number}"
 
     # Открытие устройства
@@ -77,32 +80,29 @@ def send_scsi_sleep_command(drive_number):
         raise ctypes.WinError(ctypes.get_last_error(), f"Не удалось открыть диск {drive_path}")
 
     try:
-        # Настройка структуры SCSI_PASS_THROUGH_DIRECT_EX
+        # Настройка структуры SCSI_PASS_THROUGH_DIRECT
         sense_buffer = (ctypes.c_ubyte * SENSE_BUFFER_LENGTH)()
         cdb_command = (ctypes.c_ubyte * SCSI_CDB_LENGTH)()
+        cdb_command[0] = 0x1B  # Команда SCSI START STOP UNIT
+        cdb_command[4] = command  # Поле START (1 для START, 0 для STOP)
 
-        # Команда Standby Immediate (0xE0)
-        cdb_command[0] = 0xE0  # SCSI команда
-
-        scsi_command = SCSI_PASS_THROUGH_DIRECT_EX()
-        scsi_command.Version = 0x6  # Версия структуры
-        scsi_command.Length = ctypes.sizeof(SCSI_PASS_THROUGH_DIRECT_EX)
-        scsi_command.CdbLength = 0x6  # Длина команды
-        scsi_command.Flags = 0x0  # Нет дополнительных флагов
-        scsi_command.Reserved = 0x0
-        scsi_command.DataTransferLength = 0x0
-        scsi_command.TimeOutValue = 0xA  # Таймаут 10 секунд
-        scsi_command.DataBufferOffset = 0x0
+        scsi_command = SCSI_PASS_THROUGH_DIRECT()
+        scsi_command.Length = ctypes.sizeof(SCSI_PASS_THROUGH_DIRECT)
+        scsi_command.CdbLength = 6  # Длина команды
+        scsi_command.DataIn = 0  # Данные не передаются
+        scsi_command.DataTransferLength = 0
+        scsi_command.TimeOutValue = 10  # Таймаут в секундах
+        scsi_command.DataBuffer = None
         scsi_command.SenseInfoOffset = ctypes.addressof(sense_buffer)
         scsi_command.Cdb = cdb_command
 
         # Выполнение команды
         bytes_returned = wintypes.DWORD()
-        print(f"Отправка команды Standby Immediate на диск {drive_number}...")
+        print("Отправка команды START/STOP UNIT...")
 
         success = DeviceIoControl(
             handle,
-            IOCTL_SCSI_PASS_THROUGH_DIRECT_EX,
+            IOCTL_SCSI_PASS_THROUGH_DIRECT,
             ctypes.byref(scsi_command),
             ctypes.sizeof(scsi_command),
             None,
@@ -114,13 +114,26 @@ def send_scsi_sleep_command(drive_number):
         if not success:
             raise ctypes.WinError(ctypes.get_last_error(), "Ошибка выполнения DeviceIoControl")
 
-        print(f"Команда Standby Immediate успешно отправлена на диск {drive_number}.")
+        if command == 1:
+            print(f"Команда START UNIT успешно отправлена на диск {drive_number}.")
+        else:
+            print(f"Команда STOP UNIT успешно отправлена на диск {drive_number}.")
     finally:
         CloseHandle(handle)
 
-# if name == "main":
-drive_number = 1  # Номер диска
-try:
-    send_scsi_sleep_command(drive_number)
-except Exception as e:
-    print(f"Ошибка: {e}")
+def scsi_sleep_command(idxs):
+    
+    for i in idxs:
+        try:
+            send_scsi_command(i, 0)
+        except FileNotFoundError as ex:
+            if "WinError 2" not in str(ex):
+                print(ex)
+                
+# # Пример использования
+# drive_number = 2  # Номер диска
+# try:
+#     send_scsi_command(drive_number, 0)  # Отправка команды STOP UNIT
+#     # send_scsi_command(drive_number, 1)  # Отправка команды START UNIT
+# except Exception as e:
+#     print(f"Ошибка: {e}")

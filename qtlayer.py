@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
 import threading
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QIcon
+from scsi_start_stop_unit import scsi_sleep_command
 import sys
 import diskutils as du
 # from diskutils import get_disk_info, get_partition_count, delete_disk_partitions  # Импортируем функцию для получения информации о дисках
@@ -27,11 +28,13 @@ class DiskApp(QWidget):
         # self.disk_list.setContentsMargins(0, 0, 0, 0)
         
         # Кнопка для очистки разделов
-        self.clear_button = QPushButton("Clear disks partitions")
-        self.eject_button = QPushButton("Stop spindle and eject")
+        self.cleard_button = QPushButton("Clear partitions (DEFAULT)")
+        self.clearr_button = QPushButton("Clear partitions (RESCAN)")
+        self.eject_button = QPushButton("Send sleep command (SCSI)")
         self.refresh_button = QPushButton("Enable refresh")
         
-        self.clear_button.clicked.connect(self.clear_selected_partitions)
+        self.cleard_button.clicked.connect(self.clear_selected_partitions)
+        self.clearr_button.clicked.connect(self.rescan_clear)
         self.eject_button.clicked.connect(self.eject_device)
         self.refresh_button.clicked.connect(self.enable_refresh)
         
@@ -47,7 +50,8 @@ class DiskApp(QWidget):
         # Устанавливаем компоновщик
         self.layout.addWidget(self.disk_list)
         # self.layout.addWidget(self.green_circle_label)
-        self.layout.addWidget(self.clear_button)
+        self.layout.addWidget(self.cleard_button)
+        self.layout.addWidget(self.clearr_button)
         self.layout.addWidget(self.eject_button)
         self.layout.addWidget(self.refresh_button)
         self.setLayout(self.layout)
@@ -78,14 +82,28 @@ class DiskApp(QWidget):
         self.clearing_thread: threading.Thread = None
         self.clr_thr_timer = QTimer()
         self.clr_thr_timer.timeout.connect(self.clearing_activity)
+
+        self.scsi_sleep_thread: threading.Thread = None
+        self.sleep_thr_timer = QTimer()
+        self.sleep_thr_timer.timeout.connect(self.scsi_sleep_activity)
         
     def clearing_activity(self):
         
         if not self.clearing_thread.is_alive():
             self.clr_thr_timer.stop()
-            self.clear_button.setDisabled(False)
-            self.clear_button.setText("Clear disk partitions")
-            self.clear_button.setStyleSheet("color: white;")
+            self.cleard_button.setDisabled(False)
+            self.clearr_button.setDisabled(False)
+            self.cleard_button.setText("Clear partitions (DEFAULT)")
+            self.clearr_button.setText("Clear partitions (RESCAN)")
+            self.cleard_button.setStyleSheet("color: white;")
+
+    def scsi_sleep_activity(self):
+        
+        if not self.scsi_sleep_thread.is_alive():
+            self.sleep_thr_timer.stop()
+            self.eject_button.setDisabled(False)
+            self.eject_button.setText("Send sleep command (SCSI)")
+            self.eject_button.setStyleSheet("color: white;")
 
     def _configure_markers_info(self):
         widget = QWidget()  # Создаем виджет для элемента
@@ -259,11 +277,27 @@ class DiskApp(QWidget):
                 selected_indices.append(index)  # Добавляем индекс выделенного элемента
 
         if selected_indices:
-            for i in selected_indices:
-                du.stop_spindle(i)
-                du.eject_device(i)
+
+            self.scsi_sleep_thread = threading.Thread(target=scsi_sleep_command, args=(selected_indices, ), daemon=True)
+            self.scsi_sleep_thread.start()
+            self.sleep_thr_timer.start(200)
+            self.eject_button.setDisabled(True)
+            self.eject_button.setText("SENDING SLEEP TO DEVICES...")
+            self.eject_button.setStyleSheet("color: #DC93CD")
+            # print("Selected partitions to clear:", selected_indices)
+
+
+            # for i in selected_indices:
+            #     try:
+            #         scsi_sleep_command(i)
+            #     except FileNotFoundError as ex:
+            #         if "WinError 2" in str(ex):
+            #             ...
+            #         else:
+            #             print(ex)
+                # du.eject_device(i)
     
-    def clear_selected_partitions(self):
+    def rescan_clear(self):
         selected_indices = []  # Список для хранения индексов выделенных элементов
         for index in range(self.disk_list.count()):
             item = self.disk_list.item(index)
@@ -274,12 +308,33 @@ class DiskApp(QWidget):
                 selected_indices.append(index)  # Добавляем индекс выделенного элемента
 
         if selected_indices:
-            self.clearing_thread = threading.Thread(target=du.delete_disk_partitions, args=(selected_indices, ))
+            self.clearing_thread = threading.Thread(target=du.delete_disk_partitions, args=(selected_indices, True,  ), daemon=True)
             self.clearing_thread.start()
             self.clr_thr_timer.start(200)
-            self.clear_button.setDisabled(True)
-            self.clear_button.setText("CLEARING PARTITIONS...")
-            self.clear_button.setStyleSheet("color: #DC93CD")
+            self.clearr_button.setDisabled(True)
+            self.cleard_button.setDisabled(True)
+            self.clearr_button.setText("CLEARING PARTITIONS...")
+            self.clearr_button.setStyleSheet("color: #DC93CD")
+            print("Selected partitions to clear:", selected_indices)
+
+    def clear_selected_partitions(self, rescan=False):
+        selected_indices = []  # Список для хранения индексов выделенных элементов
+        for index in range(self.disk_list.count()):
+            item = self.disk_list.item(index)
+            widget = self.disk_list.itemWidget(item)  # Получаем виджет для элемента
+            checkbox = widget.findChild(QCheckBox)  # Находим чекбокс в виджете
+            if checkbox.isChecked():
+                # delete_disk_partitions(index)
+                selected_indices.append(index)  # Добавляем индекс выделенного элемента
+
+        if selected_indices:
+            self.clearing_thread = threading.Thread(target=du.delete_disk_partitions, args=(selected_indices, rescan, ), daemon=True)
+            self.clearing_thread.start()
+            self.clr_thr_timer.start(200)
+            self.cleard_button.setDisabled(True)
+            self.clearr_button.setDisabled(True)
+            self.cleard_button.setText("CLEARING PARTITIONS...")
+            self.cleard_button.setStyleSheet("color: #DC93CD")
             print("Selected partitions to clear:", selected_indices)
 
 if __name__ == "__main__":
