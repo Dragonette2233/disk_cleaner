@@ -96,6 +96,7 @@ class DiskApp(QWidget):
             self.cleard_button.setText("Clear partitions (DEFAULT)")
             self.clearr_button.setText("Clear partitions (RESCAN)")
             self.cleard_button.setStyleSheet("color: white;")
+            self.clearr_button.setStyleSheet("color: white;")
 
     def scsi_sleep_activity(self):
         
