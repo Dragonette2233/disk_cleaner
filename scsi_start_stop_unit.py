@@ -136,11 +136,14 @@ def send_scsi_command(drive_number, command, check=False):
 
         if check:
             # Анализ данных sense buffer
-            additional_sense_code = data_buffer[16]
+            additional_sense_code = data_buffer[16] == 0x00
+            usb_flash_code = data_buffer[2] == 2
         
             # print(f"Sense Data: {[hex(x) for x in data_buffer]}")
-
-            if additional_sense_code == 0x00:
+            # print(additional_sense_code)
+            if usb_flash_code:
+                return False
+            elif additional_sense_code:
                 # print(f"Диск {drive_number} находится в режиме энергосбережения (standby).")
                 return True
             else:
@@ -201,7 +204,7 @@ def check_disk_power_state(drive_number):
             raise ctypes.WinError(error_code, f"Ошибка выполнения DeviceIoControl: {error_code}")
 
         # Анализ данных sense buffer
-        # print(f"Sense Data: {[hex(x) for x in data_buffer]}")  # Для отладки
+        print(f"Sense Data: {[hex(x) for x in data_buffer]}")  # Для отладки
         additional_sense_code = data_buffer[16]
         # additional_sense_qualifier = data_buffer[13]
 
