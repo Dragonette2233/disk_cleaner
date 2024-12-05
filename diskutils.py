@@ -218,7 +218,7 @@ def get_disk_info(disk_index):
         s_e = str(e)
         if 'CRC' in s_e:
             partition_info = 'CRC'
-        elif 'ввода' in s_e:
+        elif 'ввода' in s_e or 'WinError 1117' in s_e:
             partition_info = 'IO'
         elif 'не подключено' in s_e:
             partition_info = 'NC'

@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
 import threading
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QIcon
-from scsi_start_stop_unit import scsi_sleep_command
+from scsi_start_stop_unit import scsi_sleep_command, is_disk_sleeping
 import sys
 import diskutils as du
 # from diskutils import get_disk_info, get_partition_count, delete_disk_partitions  # Импортируем функцию для получения информации о дисках
@@ -16,7 +16,7 @@ class DiskApp(QWidget):
     def __init__(self):
         super().__init__()
         # Создаем основной компоновщик
-        self.setWindowTitle("Disk Layout Cleaner")
+        self.setWindowTitle("HHD-Handler")
         self.layout = QVBoxLayout()
         self.icon = QIcon('lib\\hdd.ico')
         self.setWindowIcon(self.icon)
@@ -116,31 +116,38 @@ class DiskApp(QWidget):
         red_mrk = self._colored_marker('red')
         grey_mrk = self._colored_marker('grey')
         orange_mrk = self._colored_marker('orange')
+        violet_mark = self._colored_marker('#9500F4')
+
         
         
         # Добавляем кружочки и текст к каждому индикатору
         h_layout.addWidget(green_mrk)
-        h_layout.addWidget(QLabel("disk w/o partitions"))
+        h_layout.addWidget(QLabel("w/o partitions"))
 
-        h_layout.addSpacing(20)  # Расстояние между кружочками
+        h_layout.addSpacing(10)  # Расстояние между кружочками
 
         h_layout.addWidget(yellow_mrk)
-        h_layout.addWidget(QLabel("must be cleared"))
+        h_layout.addWidget(QLabel("with partitions"))
 
-        h_layout.addSpacing(20)  # Расстояние между кружочками
+        h_layout.addSpacing(10)  # Расстояние между кружочками
 
         h_layout.addWidget(red_mrk)
         h_layout.addWidget(QLabel("not connected"))
 
-        h_layout.addSpacing(20)  # Расстояние между кружочками
+        h_layout.addSpacing(10)  # Расстояние между кружочками
 
         h_layout.addWidget(grey_mrk)
-        h_layout.addWidget(QLabel("disk is busy"))
+        h_layout.addWidget(QLabel("busy"))
 
-        h_layout.addSpacing(20)  # Расстояние между кружочками
+        h_layout.addSpacing(10)  # Расстояние между кружочками
 
         h_layout.addWidget(orange_mrk)
-        h_layout.addWidget(QLabel("init err "))
+        h_layout.addWidget(QLabel("Err"))
+
+        h_layout.addSpacing(10)  # Расстояние между кружочками
+
+        h_layout.addWidget(violet_mark)
+        h_layout.addWidget(QLabel("in sleep"))
 
 
         # Добавляем компоновщик с цветными кружками и текстом в основной макет окна
@@ -171,18 +178,22 @@ class DiskApp(QWidget):
             info = du.get_disk_info(i)  # Получаем информацию о диске
             # partition_info = get_partition_count(i)
             if info:
-                disks_info.append(info)  # Извлекаем модель и серийный номер
+                disks_info.append(list(info))
+                disks_info[i].append(is_disk_sleeping(i))  # Извлекаем модель и серийный номер
                 connected_drives += 1
             else:
-                disks_info.append((i, "Not connected", "", "UL"))  # Если диск не подключен
+                disks_info.append((i, "Not connected", "", "UL", False))  # Если диск не подключен
         
-        part_sequence = ''.join(i[3] for i in disks_info)
+        # print(disks_info)
+
+        part_sequence = ''.join(i[3] + str(i[-1]) for i in disks_info)
         # print(part_sequence)
         refresh_require = [
             self.partition_sequence != part_sequence,
             self.connected_drives_cache != connected_drives
         ]
 
+        
 
         if any(refresh_require):
             self.connected_drives_cache = connected_drives
@@ -190,7 +201,7 @@ class DiskApp(QWidget):
             self.disk_list.clear()
             # print('lst of drives updated')
             # start = time.time()
-            for i, model, serial, p_info in disks_info:
+            for i, model, serial, p_info, is_sleep in disks_info:
                 
                 # Метка для кружка
                 # p_info = get_partition_count(i
@@ -205,29 +216,31 @@ class DiskApp(QWidget):
                 checkbox.setStyleSheet("text-align: end;")  # Устанавливаем цвет текста чекбокса
 
                 # Создаем метку для индекса
-                # d_index = QLabel(str(i))
-                # d_index.setStyleSheet("color: white;")  # Устанавливаем цвет текста метки индекса
 
-
-
-
-                # self.clear_partition_states[i] = p_info
-                match p_info, model:
-                    case 'UL' | 'NL' | 'NC', 'Not connected':
+                match p_info, model, is_sleep:
+                    case p_info, model, 'IO':
+                        model = model + ' (I/O Err)'
+                        cclr = 'orange'
+                    case 'UL' | 'NL' | 'NC', 'Not connected', False:
                         cclr = 'red'
-                    case 'EL', model:
+                    case 'EL', model, False:
                         cclr = 'yellow'
-                    case 'NL', model:
+                    case 'NL', model, False:
                         cclr = 'green'
-                    case 'CRC' | 'IO', model:
+                    case 'CRC' | 'IO', model, False:
                         if p_info == 'CRC':
                             model = model + ' (CRC Err)'
                         if p_info == 'IO':
                             model = model + ' (I/O Err)'
                         cclr = 'orange'
+                    case p_info, model, True:
+                        cclr = '#9500F4'
                     case _:
-                        print(p_info, model)
                         cclr = 'grey'
+
+                if serial.startswith('0000'):
+                    serial = "..."
+
                     
                 
                 
@@ -238,6 +251,7 @@ class DiskApp(QWidget):
                 
                 # Создаем метку для модели
                 model_label = QLabel(f"[{i}] " + model)
+                
                 clr_m = "red" if model == 'Not connected' else '#27C4E2'
                 model_label.setStyleSheet("color: %s;" % clr_m)  # Установка цвета для модели
 
