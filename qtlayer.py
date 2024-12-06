@@ -242,7 +242,7 @@ class DiskApp(QWidget):
         #     self.connected_drives_cache != connected_drives
         # ]
 
-        
+        'brb'
 
         if new_data:
             self.disk_list.clear()
