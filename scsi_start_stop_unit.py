@@ -77,6 +77,10 @@ def send_scsi_command(drive_number, command, check=False):
         None,
     )
     if handle == wintypes.HANDLE(-1).value:
+        # if ctypes.get_last_error()
+        err = ctypes.get_last_error()
+        if err == 32:
+            return 'CONFLICT'
         raise ctypes.WinError(ctypes.get_last_error(), f"Не удалось открыть диск {drive_path}")
 
     try:
@@ -136,14 +140,15 @@ def send_scsi_command(drive_number, command, check=False):
 
         if check:
             # Анализ данных sense buffer
-            additional_sense_code = data_buffer[16] == 0x00
-            usb_flash_code = data_buffer[2] == 2
-        
+            additional_sense_code = data_buffer[16] == 0
+            # print(data_buffer[16])
+            # usb_flash_code = data_buffer[2] == 2
+
             # print(f"Sense Data: {[hex(x) for x in data_buffer]}")
             # print(additional_sense_code)
-            if usb_flash_code:
-                return False
-            elif additional_sense_code:
+            # if usb_flash_code:
+               #  return False
+            if additional_sense_code:
                 # print(f"Диск {drive_number} находится в режиме энергосбережения (standby).")
                 return True
             else:

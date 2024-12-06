@@ -1,3 +1,6 @@
-st = "23124_asdkl;ksal;d_00000"
+from ctypes import WinError
+import ctypes
 
-print(st[-7:])
+print(ctypes.get_last_error())
+
+raise ctypes.WinError(ctypes.get_last_error(), f"Не удалось открыть диск")

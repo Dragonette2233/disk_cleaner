@@ -142,7 +142,7 @@ def stop_spindle(drive_index):
             raise ctypes.WinError(ctypes.get_last_error(), "Ошибка выполнения DeviceIoControl")
 
         
-        print(f"Команда STOP UNIT успешно отправлена на диск {drive_index}.")
+        # print(f"Команда STOP UNIT успешно отправлена на диск {drive_index}.")
     finally:
         kernel32.CloseHandle(handle)
         

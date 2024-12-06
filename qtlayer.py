@@ -11,6 +11,44 @@ from scsi_start_stop_unit import scsi_sleep_command, is_disk_sleeping
 import sys
 import diskutils as du
 # from diskutils import get_disk_info, get_partition_count, delete_disk_partitions  # Импортируем функцию для получения информации о дисках
+        
+class ThreadData:
+    def __init__(self) -> None:
+        self.connected_drives = 0
+        self.disk_info = []
+        self.cache_part_sequence = ''
+        self.cache_connected_drives = 0
+        self.is_refresh_require = False
+    
+    def update(self):
+        n_connected_drives = 0
+
+        for i in range(10):  # Предположим, проверяем до 10 дисков
+            info = du.get_disk_info(i)  # Получаем информацию о диске
+            # partition_info = get_partition_count(i)
+            if info:
+                self.disk_info.append(list(info))
+                self.disk_info[i].append(is_disk_sleeping(i))  # Извлекаем модель и серийный номер
+                n_connected_drives += 1
+            else:
+                self.disk_info.append((i, "Not connected", "", "UL", False))  # Если диск не подключен
+        # print(self.disk_info)
+        # print(disks_info)
+
+        n_part_sequence = ''.join(i[3] + str(i[-1]) for i in self.disk_info)
+        # print(n_part_sequence)
+        # print(part_sequence)
+        self.is_refresh_require = any([
+            self.cache_part_sequence != n_part_sequence,
+            self.cache_connected_drives != n_connected_drives
+        ])
+
+        if self.is_refresh_require:
+            self.cache_connected_drives = n_connected_drives
+            self.cache_part_sequence = n_part_sequence
+            return True
+        
+            # self.disk_list.clear()
 
 class DiskApp(QWidget):
     def __init__(self):
@@ -70,6 +108,8 @@ class DiskApp(QWidget):
         """)
         self.resize(550, 340)
 
+        self.thread_data = ThreadData()
+
         # Запускаем таймер для обновления информации каждые 2 секунды
         self.timer = QTimer()
         self.timer.timeout.connect(self.refresh_disk_info)
@@ -87,6 +127,8 @@ class DiskApp(QWidget):
         self.sleep_thr_timer = QTimer()
         self.sleep_thr_timer.timeout.connect(self.scsi_sleep_activity)
         
+        
+
     def clearing_activity(self):
         
         if not self.clearing_thread.is_alive():
@@ -162,46 +204,52 @@ class DiskApp(QWidget):
     
     def enable_refresh(self):
         if not self.timer.isActive():
-            self.timer.start(1000)  # Обновление каждые 2000 миллисекунд (2 секунды)
+            self.timer.start(1000) 
             self.refresh_button.setStyleSheet("color: #41C871;")
         else:
             self.refresh_button.setStyleSheet("color: #FFFFFF;")
             self.timer.stop()
         
     def refresh_disk_info(self):
-        # self.disk_list.clear()  # Очищаем список перед обновлением
-        connected_drives = 0
-        disks_info = []
-        
-        
-        for i in range(10):  # Предположим, проверяем до 10 дисков
-            info = du.get_disk_info(i)  # Получаем информацию о диске
-            # partition_info = get_partition_count(i)
-            if info:
-                disks_info.append(list(info))
-                disks_info[i].append(is_disk_sleeping(i))  # Извлекаем модель и серийный номер
-                connected_drives += 1
-            else:
-                disks_info.append((i, "Not connected", "", "UL", False))  # Если диск не подключен
-        
-        # print(disks_info)
 
-        part_sequence = ''.join(i[3] + str(i[-1]) for i in disks_info)
-        # print(part_sequence)
-        refresh_require = [
-            self.partition_sequence != part_sequence,
-            self.connected_drives_cache != connected_drives
-        ]
+        self.thread_data.disk_info.clear()
+        new_data = self.thread_data.update()
+
+
+        # print(self.thread_data.cache_part_sequence)
+
+        # # self.disk_list.clear()  # Очищаем список перед обновлением
+        # connected_drives = 0
+        # disks_info = []
+        
+        
+        # for i in range(10):  # Предположим, проверяем до 10 дисков
+        #     info = du.get_disk_info(i)  # Получаем информацию о диске
+        #     # partition_info = get_partition_count(i)
+        #     if info:
+        #         disks_info.append(list(info))
+        #         disks_info[i].append(is_disk_sleeping(i))  # Извлекаем модель и серийный номер
+        #         connected_drives += 1
+        #     else:
+        #         disks_info.append((i, "Not connected", "", "UL", False))  # Если диск не подключен
+        
+        # # print(disks_info)
+
+        # part_sequence = ''.join(i[3] + str(i[-1]) for i in disks_info)
+        # # print(part_sequence)
+        # refresh_require = [
+        #     self.partition_sequence != part_sequence,
+        #     self.connected_drives_cache != connected_drives
+        # ]
 
         
 
-        if any(refresh_require):
-            self.connected_drives_cache = connected_drives
-            self.partition_sequence = part_sequence
+        if new_data:
             self.disk_list.clear()
             # print('lst of drives updated')
             # start = time.time()
-            for i, model, serial, p_info, is_sleep in disks_info:
+            
+            for i, model, serial, p_info, is_sleep in self.thread_data.disk_info:
                 
                 # Метка для кружка
                 # p_info = get_partition_count(i
@@ -219,7 +267,10 @@ class DiskApp(QWidget):
 
                 match p_info, model, is_sleep:
                     case p_info, model, 'IO':
-                        model = model + ' (I/O Err)'
+                        model = model + ' (I/O)'
+                        cclr = 'orange'
+                    case p_info, model, 'CONFLICT':
+                        model = model + ' (process conflict)'
                         cclr = 'orange'
                     case 'UL' | 'NL' | 'NC', 'Not connected', False:
                         cclr = 'red'
@@ -234,6 +285,7 @@ class DiskApp(QWidget):
                             model = model + ' (I/O Err)'
                         cclr = 'orange'
                     case p_info, model, True:
+                         # print(p_info, model, is_sleep)
                         cclr = '#9500F4'
                     case _:
                         cclr = 'grey'
@@ -251,7 +303,7 @@ class DiskApp(QWidget):
                 
                 # Создаем метку для модели
                 model_label = QLabel(f"[{i}] " + model)
-                
+
                 clr_m = "red" if model == 'Not connected' else '#27C4E2'
                 model_label.setStyleSheet("color: %s;" % clr_m)  # Установка цвета для модели
 
@@ -276,7 +328,7 @@ class DiskApp(QWidget):
                 self.disk_list.addItem(item)  # Добавляем элемент в QListWidget
                 self.disk_list.setItemWidget(item, widget)  # Устанавливаем виджет для элемента
                 
-                self.connected_drives_cache = connected_drives
+                # self.connected_drives_cache = connected_drives
             # print(time.time() - start)
         # else:
         #     print('no updates')
