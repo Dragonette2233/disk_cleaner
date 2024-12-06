@@ -5,9 +5,11 @@ from PyQt5.QtWidgets import (
     QHBoxLayout, QPushButton, 
     QCheckBox)
 import threading
+import time
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QIcon
 from scsi_start_stop_unit import scsi_sleep_command, is_disk_sleeping
+import queue
 import sys
 import diskutils as du
 # from diskutils import get_disk_info, get_partition_count, delete_disk_partitions  # Импортируем функцию для получения информации о дисках
@@ -19,9 +21,11 @@ class ThreadData:
         self.cache_part_sequence = ''
         self.cache_connected_drives = 0
         self.is_refresh_require = False
+        self.queue = queue.Queue()
     
     def update(self):
         n_connected_drives = 0
+        self.disk_info.clear()
 
         for i in range(10):  # Предположим, проверяем до 10 дисков
             info = du.get_disk_info(i)  # Получаем информацию о диске
@@ -36,6 +40,7 @@ class ThreadData:
         # print(disks_info)
 
         n_part_sequence = ''.join(i[3] + str(i[-1]) for i in self.disk_info)
+        
         # print(n_part_sequence)
         # print(part_sequence)
         self.is_refresh_require = any([
@@ -43,7 +48,10 @@ class ThreadData:
             self.cache_connected_drives != n_connected_drives
         ])
 
+        # print(self.is_refresh_require)
+
         if self.is_refresh_require:
+            self.queue.put(self.disk_info.copy())
             self.cache_connected_drives = n_connected_drives
             self.cache_part_sequence = n_part_sequence
             return True
@@ -75,6 +83,7 @@ class DiskApp(QWidget):
         self.clearr_button.clicked.connect(self.rescan_clear)
         self.eject_button.clicked.connect(self.eject_device)
         self.refresh_button.clicked.connect(self.enable_refresh)
+        # self.enable_refresh()
         
  
         
@@ -115,10 +124,13 @@ class DiskApp(QWidget):
         self.timer.timeout.connect(self.refresh_disk_info)
 
         # Первая инициализация информации о дисках
-        self.connected_drives_cache = 0
-        self.partition_sequence = ''
+        # elf.connected_drives_cache = 0
+        # self.partition_sequence = ''
+        self.thread_data.update()
         self.refresh_disk_info()
+        self.enable_refresh()
         
+        self.update_thread = threading.Thread(target=self.run_update_thread, daemon=True).start()
         self.clearing_thread: threading.Thread = None
         self.clr_thr_timer = QTimer()
         self.clr_thr_timer.timeout.connect(self.clearing_activity)
@@ -204,52 +216,31 @@ class DiskApp(QWidget):
     
     def enable_refresh(self):
         if not self.timer.isActive():
-            self.timer.start(1000) 
+            self.timer.start(500) 
             self.refresh_button.setStyleSheet("color: #41C871;")
         else:
             self.refresh_button.setStyleSheet("color: #FFFFFF;")
             self.timer.stop()
-        
+    
+    def run_update_thread(self):
+
+        while True:
+            self.thread_data.update()
+            time.sleep(1)
+            
+
     def refresh_disk_info(self):
-
-        self.thread_data.disk_info.clear()
-        new_data = self.thread_data.update()
-
-
-        # print(self.thread_data.cache_part_sequence)
-
-        # # self.disk_list.clear()  # Очищаем список перед обновлением
-        # connected_drives = 0
-        # disks_info = []
-        
-        
-        # for i in range(10):  # Предположим, проверяем до 10 дисков
-        #     info = du.get_disk_info(i)  # Получаем информацию о диске
-        #     # partition_info = get_partition_count(i)
-        #     if info:
-        #         disks_info.append(list(info))
-        #         disks_info[i].append(is_disk_sleeping(i))  # Извлекаем модель и серийный номер
-        #         connected_drives += 1
-        #     else:
-        #         disks_info.append((i, "Not connected", "", "UL", False))  # Если диск не подключен
-        
-        # # print(disks_info)
-
-        # part_sequence = ''.join(i[3] + str(i[-1]) for i in disks_info)
-        # # print(part_sequence)
-        # refresh_require = [
-        #     self.partition_sequence != part_sequence,
-        #     self.connected_drives_cache != connected_drives
-        # ]
-
-        'brb'
-
-        if new_data:
+        if self.thread_data.is_refresh_require:
+            try:
+                disk_info = self.thread_data.queue.get_nowait()
+            except queue.Empty:
+                return
+            
             self.disk_list.clear()
             # print('lst of drives updated')
             # start = time.time()
             
-            for i, model, serial, p_info, is_sleep in self.thread_data.disk_info:
+            for i, model, serial, p_info, is_sleep in disk_info:
                 
                 # Метка для кружка
                 # p_info = get_partition_count(i
