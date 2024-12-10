@@ -133,7 +133,7 @@ def read_smart_attributes(drive_number):
 
 
 # Использование
-drive_number = 1  # Номер диска
+drive_number = 2  # Номер диска
 try:
     smart_attributes = read_smart_attributes(drive_number)
     print("SMART параметры:")

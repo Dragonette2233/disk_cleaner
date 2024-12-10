@@ -197,6 +197,10 @@ def get_disk_info(disk_index):
 
     if not result:
         print(f"Failed to get disk info for disk {disk_index}. Error: {ctypes.get_last_error()}")
+
+        if ctypes.get_last_error() == 55:
+            return 'OUT'
+
         return None
 
     # Извлекаем информацию о модели и серийнике из буфера

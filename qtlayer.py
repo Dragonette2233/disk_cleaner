@@ -3,16 +3,15 @@ from PyQt5.QtWidgets import (
     QListWidget, QVBoxLayout, 
     QListWidgetItem, QLabel, 
     QHBoxLayout, QPushButton, 
-    QCheckBox)
+    QCheckBox, QMenu)
 import threading
 import time
-from PyQt5.QtCore import QTimer
-from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtGui import QIcon, QCursor
 from scsi_start_stop_unit import scsi_sleep_command, is_disk_sleeping
 import queue
 import sys
 import diskutils as du
-# from diskutils import get_disk_info, get_partition_count, delete_disk_partitions  # Импортируем функцию для получения информации о дисках
         
 class ThreadData:
     def __init__(self) -> None:
@@ -29,26 +28,19 @@ class ThreadData:
 
         for i in range(10):  # Предположим, проверяем до 10 дисков
             info = du.get_disk_info(i)  # Получаем информацию о диске
-            # partition_info = get_partition_count(i)
             if info:
                 self.disk_info.append(list(info))
                 self.disk_info[i].append(is_disk_sleeping(i))  # Извлекаем модель и серийный номер
                 n_connected_drives += 1
             else:
                 self.disk_info.append((i, "Not connected", "", "UL", False))  # Если диск не подключен
-        # print(self.disk_info)
-        # print(disks_info)
+
 
         n_part_sequence = ''.join(i[3] + str(i[-1]) for i in self.disk_info)
-        
-        # print(n_part_sequence)
-        # print(part_sequence)
         self.is_refresh_require = any([
             self.cache_part_sequence != n_part_sequence,
             self.cache_connected_drives != n_connected_drives
         ])
-
-        # print(self.is_refresh_require)
 
         if self.is_refresh_require:
             self.queue.put(self.disk_info.copy())
@@ -56,8 +48,6 @@ class ThreadData:
             self.cache_part_sequence = n_part_sequence
             return True
         
-            # self.disk_list.clear()
-
 class DiskApp(QWidget):
     def __init__(self):
         super().__init__()
@@ -70,6 +60,10 @@ class DiskApp(QWidget):
         
         # Создаем QListWidget
         self.disk_list = QListWidget()
+        self.disk_labels = {
+            'model': [QLabel() for _ in range(10)],
+            'serial': [QLabel() for _ in range(10)]
+        }
         # self.disk_list.setSpacing(10)
         # self.disk_list.setContentsMargins(0, 0, 0, 0)
         
@@ -196,12 +190,12 @@ class DiskApp(QWidget):
         h_layout.addSpacing(10)  # Расстояние между кружочками
 
         h_layout.addWidget(orange_mrk)
-        h_layout.addWidget(QLabel("Err"))
+        h_layout.addWidget(QLabel("err"))
 
         h_layout.addSpacing(10)  # Расстояние между кружочками
 
         h_layout.addWidget(violet_mark)
-        h_layout.addWidget(QLabel("in sleep"))
+        h_layout.addWidget(QLabel("sleep"))
 
 
         # Добавляем компоновщик с цветными кружками и текстом в основной макет окна
@@ -227,7 +221,27 @@ class DiskApp(QWidget):
         while True:
             self.thread_data.update()
             time.sleep(1)
-            
+    
+    def show_context_menu(self, position, lb: QLabel, num=0):
+        print(num)
+        # Создаем контекстное меню
+        context_menu = QMenu(self)
+
+        # Добавляем пункты меню
+        action_1 = context_menu.addAction("Действие 1")
+        action_2 = context_menu.addAction("Действие 2")
+        action_3 = context_menu.addAction("Действие 3")
+
+        # Отображаем меню в позиции курсора
+        action = context_menu.exec_(lb.mapToGlobal(position))
+
+        # Обработка выбранного действия
+        if action == action_1:
+            print("Вы выбрали Действие 1")
+        elif action == action_2:
+            print("Вы выбрали Действие 2")
+        elif action == action_3:
+            print("Вы выбрали Действие 3")
 
     def refresh_disk_info(self):
         if self.thread_data.is_refresh_require:
@@ -269,11 +283,14 @@ class DiskApp(QWidget):
                         cclr = 'yellow'
                     case 'NL', model, False:
                         cclr = 'green'
-                    case 'CRC' | 'IO', model, False:
+                    case 'CRC' | 'IO' | 'OUT', model, False:
                         if p_info == 'CRC':
-                            model = model + ' (CRC Err)'
-                        if p_info == 'IO':
-                            model = model + ' (I/O Err)'
+                            model = model + ' (CRC)'
+                        elif p_info == 'IO':
+                            model = model + ' (I/O)'
+                        elif p_info == 'OUT':
+                            model = model + ' (Disconnected)'
+                        
                         cclr = 'orange'
                     case p_info, model, True:
                          # print(p_info, model, is_sleep)
@@ -284,24 +301,25 @@ class DiskApp(QWidget):
                 if serial.startswith('0000'):
                     serial = "..."
 
-                    
-                
-                
                 circle = self._colored_marker(color=cclr)
                 # circle = QLabel()
                 # circle.setFixedSize(15, 15)  # Устанавливаем размер кружка
                 # circle.setStyleSheet("background-color: %s; border-radius: 7.5px;" % cclr)
                 
                 # Создаем метку для модели
-                model_label = QLabel(f"[{i}] " + model)
+                model_label = QLabel(f"[ {i} ]  " + model)
 
                 clr_m = "red" if model == 'Not connected' else '#27C4E2'
                 model_label.setStyleSheet("color: %s;" % clr_m)  # Установка цвета для модели
 
                 # Создаем метку для серийного номера
                 serial_label = QLabel("S/N: " + serial.strip())
+                # serial_label.setText("OPP")
                 serial_label.setStyleSheet("color: #65FA48;")  # Установка цвета для серийного номера
                 
+                
+
+                # h_layout.addWidget(label)
                 # Добавляем виджеты в горизонтальный компоновщик
                 h_layout.addWidget(circle)
                 h_layout.addWidget(model_label)
@@ -310,7 +328,7 @@ class DiskApp(QWidget):
                 h_layout.addWidget(checkbox)
                 
                 
-                h_layout.setSpacing(1)  # Задайте нужное расстояние в пикселях
+                # h_layout.setSpacing(0)  # Задайте нужное расстояние в пикселях
                 # h_layout.setAlignment()
                 h_layout.setContentsMargins(0, 0, 0, 0)  # Убираем отступы
 
@@ -318,13 +336,8 @@ class DiskApp(QWidget):
                 item.setSizeHint(widget.sizeHint())  # Устанавливаем размер элемента
                 self.disk_list.addItem(item)  # Добавляем элемент в QListWidget
                 self.disk_list.setItemWidget(item, widget)  # Устанавливаем виджет для элемента
-                
-                # self.connected_drives_cache = connected_drives
-            # print(time.time() - start)
-        # else:
-        #     print('no updates')
-
-    def eject_device(self):
+ 
+    def gather_indices(self) -> list:
         selected_indices = []  # Список для хранения индексов выделенных элементов
         for index in range(self.disk_list.count()):
             item = self.disk_list.item(index)
@@ -335,6 +348,12 @@ class DiskApp(QWidget):
                 selected_indices.append(index)  # Добавляем индекс выделенного элемента
 
         if selected_indices:
+            return selected_indices
+
+    def eject_device(self):
+        selected_indices = self.gather_indices()
+
+        if selected_indices:
 
             self.scsi_sleep_thread = threading.Thread(target=scsi_sleep_command, args=(selected_indices, ), daemon=True)
             self.scsi_sleep_thread.start()
@@ -342,28 +361,9 @@ class DiskApp(QWidget):
             self.eject_button.setDisabled(True)
             self.eject_button.setText("SENDING SLEEP TO DEVICES...")
             self.eject_button.setStyleSheet("color: #DC93CD")
-            # print("Selected partitions to clear:", selected_indices)
 
-
-            # for i in selected_indices:
-            #     try:
-            #         scsi_sleep_command(i)
-            #     except FileNotFoundError as ex:
-            #         if "WinError 2" in str(ex):
-            #             ...
-            #         else:
-            #             print(ex)
-                # du.eject_device(i)
-    
     def rescan_clear(self):
-        selected_indices = []  # Список для хранения индексов выделенных элементов
-        for index in range(self.disk_list.count()):
-            item = self.disk_list.item(index)
-            widget = self.disk_list.itemWidget(item)  # Получаем виджет для элемента
-            checkbox = widget.findChild(QCheckBox)  # Находим чекбокс в виджете
-            if checkbox.isChecked():
-                # delete_disk_partitions(index)
-                selected_indices.append(index)  # Добавляем индекс выделенного элемента
+        selected_indices = self.gather_indices()
 
         if selected_indices:
             self.clearing_thread = threading.Thread(target=du.delete_disk_partitions, args=(selected_indices, True,  ), daemon=True)
@@ -376,14 +376,7 @@ class DiskApp(QWidget):
             print("Selected partitions to clear:", selected_indices)
 
     def clear_selected_partitions(self, rescan=False):
-        selected_indices = []  # Список для хранения индексов выделенных элементов
-        for index in range(self.disk_list.count()):
-            item = self.disk_list.item(index)
-            widget = self.disk_list.itemWidget(item)  # Получаем виджет для элемента
-            checkbox = widget.findChild(QCheckBox)  # Находим чекбокс в виджете
-            if checkbox.isChecked():
-                # delete_disk_partitions(index)
-                selected_indices.append(index)  # Добавляем индекс выделенного элемента
+        selected_indices = self.gather_indices()
 
         if selected_indices:
             self.clearing_thread = threading.Thread(target=du.delete_disk_partitions, args=(selected_indices, rescan, ), daemon=True)

@@ -1,62 +1,55 @@
-import ctypes
-import ctypes.wintypes as wintypes
-import os
+import sys
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QApplication, QLabel, QMenu, QVBoxLayout, QWidget
 
-# Определяем константы
-GENERIC_WRITE = 0x40000000
-GENERIC_READ = 0x80000000
-FILE_SHARE_READ = 0x00000001
-FILE_SHARE_WRITE = 0x00000002
-OPEN_EXISTING = 3
-IOCTL_DISK_DELETE_DRIVE_LAYOUT = 0x0000042E  # Управляющий код
 
-# Загрузка функций из библиотеки kernel32
-kernel32 = ctypes.windll.kernel32
+class ContextMenuExample(QWidget):
+    def init(self):
+        super().init()
 
-def open_disk_by_index(disk_index):
-    """Открытие диска по индексу для управления."""
-    device_path = f"\\\\.\\PhysicalDrive{disk_index}"
-    handle = kernel32.CreateFileW(
-        device_path,
-        GENERIC_READ | GENERIC_WRITE,
-        FILE_SHARE_READ | FILE_SHARE_WRITE,
-        None,
-        OPEN_EXISTING,
-        0,
-        None
-    )
-    
-    if handle == wintypes.HANDLE(-1).value:
-        raise ctypes.WinError()
-    return handle
+        # Устанавливаем основной интерфейс
+        self.setWindowTitle("Пример контекстного меню на QLabel")
+        self.resize(300, 200)
 
-def delete_drive_layout(disk_index):
-    """Удаление разметки диска с помощью IOCTL_DISK_DELETE_DRIVE_LAYOUT."""
-    handle = open_disk_by_index(disk_index)
-    bytes_returned = wintypes.DWORD(0)
-    
-    try:
-        result = kernel32.DeviceIoControl(
-            handle,
-            IOCTL_DISK_DELETE_DRIVE_LAYOUT,
-            None,
-            0,
-            None,
-            0,
-            ctypes.byref(bytes_returned),
-            None
-        )
-        if not result:
-            raise ctypes.WinError()
-        print(f"Разделы на диске {disk_index} успешно удалены.")
-    except ctypes.WinError as e:
-        if e.winerror == 5:  # Ошибка доступа
-            print("Ошибка доступа (winerror 5). Запустите скрипт с правами администратора.")
-        else:
-            print(f"Ошибка: {e}")
-    finally:
-        kernel32.CloseHandle(handle)
+        # Создаем QLabel
+        self.label = QLabel("Нажмите ПКМ на этом тексте", self)
+        self.label.setContextMenuPolicy(Qt.CustomContextMenu)  # Включаем поддержку пользовательского контекстного меню
+        self.label.customContextMenuRequested.connect(self.show_context_menu)
 
-# Пример вызова функции
-disk_index = 1  # Индекс целевого диска
-delete_drive_layout(disk_index)
+        # Настройка интерфейса
+        layout = QVBoxLayout()
+        layout.addWidget(self.label)
+        self.setLayout(layout)
+
+        """
+        label = QLabel("Нажмите ПКМ на этом тексте", self)
+        label.setContextMenuPolicy(Qt.CustomContextMenu)  # Включаем поддержку пользовательского контекстного меню
+        label.customContextMenuRequested.connect(lambda: self.show_context_menu(QCursor.pos))
+        """
+
+    def show_context_menu(self, position):
+        # Создаем контекстное меню
+        context_menu = QMenu(self)
+
+        # Добавляем пункты меню
+        action_1 = context_menu.addAction("Действие 1")
+        action_2 = context_menu.addAction("Действие 2")
+        action_3 = context_menu.addAction("Действие 3")
+
+        # Отображаем меню в позиции курсора
+        action = context_menu.exec_(self.label.mapToGlobal(position))
+
+        # Обработка выбранного действия
+        if action == action_1:
+            print("Вы выбрали Действие 1")
+        elif action == action_2:
+            print("Вы выбрали Действие 2")
+        elif action == action_3:
+            print("Вы выбрали Действие 3")
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = ContextMenuExample()
+    window.show()
+    sys.exit(app.exec_())
