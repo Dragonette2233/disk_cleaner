@@ -44,9 +44,9 @@ bdist_dmg_options = {
 executables = [Executable("main.py", base="gui", icon="hdd.ico", target_name='dlc')]
 
 setup(
-    name="Disk-Cleaner",
-    version="1.15",
-    description="Disk Cleaner with diskpart integrated",
+    name="HDD-Handler",
+    version="1.2",
+    description="HDD-Handler",
     options={
         "build_exe": build_exe_options,
        #  "bdist_mac": bdist_mac_options,

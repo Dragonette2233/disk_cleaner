@@ -200,8 +200,9 @@ def get_disk_info(disk_index):
 
         if ctypes.get_last_error() == 55:
             return 'OUT'
-
-        return None
+        else:
+            print(ctypes.get_last_error())
+            return 'OUT'
 
     # Извлекаем информацию о модели и серийнике из буфера
     descriptor = STORAGE_DEVICE_DESCRIPTOR.from_buffer_copy(buffer)

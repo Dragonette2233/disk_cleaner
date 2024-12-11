@@ -79,9 +79,14 @@ def send_scsi_command(drive_number, command, check=False):
     if handle == wintypes.HANDLE(-1).value:
         # if ctypes.get_last_error()
         err = ctypes.get_last_error()
-        if err == 32:
-            return 'CONFLICT'
-        raise ctypes.WinError(ctypes.get_last_error(), f"Не удалось открыть диск {drive_path}")
+        match err:
+            case 32:
+                return 'CONFLICT'
+            case 2:
+                return False
+            case _:
+                open('sleep_err.txt', 'w+', encoding='utf-8').write(f'Err in sleep line 88: winerror {err}')
+                raise ctypes.WinError(err, f"Не удалось открыть диск {drive_path}")
 
     try:
         # Настройка структуры SCSI_PASS_THROUGH_DIRECT
