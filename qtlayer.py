@@ -28,7 +28,10 @@ class ThreadData:
 
         for i in range(10):  # Предположим, проверяем до 10 дисков
             info = du.get_disk_info(i)  # Получаем информацию о диске
-            if info:
+            #  print(info)
+            if info == 'OUT':
+                self.disk_info.append((i, "! Disconnected !", "", "UL", False))  # Если диск не подключен
+            elif isinstance(info, tuple): # if info is tuple, not 'OUT
                 self.disk_info.append(list(info))
                 self.disk_info[i].append(is_disk_sleeping(i))  # Извлекаем модель и серийный номер
                 n_connected_drives += 1
@@ -36,7 +39,7 @@ class ThreadData:
                 self.disk_info.append((i, "Not connected", "", "UL", False))  # Если диск не подключен
 
 
-        n_part_sequence = ''.join(i[3] + str(i[-1]) for i in self.disk_info)
+        n_part_sequence = ''.join(str(i[3]) + str(i[-1]) for i in self.disk_info)
         self.is_refresh_require = any([
             self.cache_part_sequence != n_part_sequence,
             self.cache_connected_drives != n_connected_drives
@@ -86,10 +89,10 @@ class DiskApp(QWidget):
         }
 
         # Кнопка для очистки разделов
-        self.cleard_button = QPushButton("Clear partitions (DEFAULT)")
-        self.clearr_button = QPushButton("Clear partitions (RESCAN)")
-        self.eject_button = QPushButton("Send sleep command (SCSI)")
-        self.refresh_button = QPushButton("Enable refresh")
+        self.cleard_button = QPushButton("Clear DEFAULT")
+        self.clearr_button = QPushButton("Clear RESCAN")
+        self.eject_button = QPushButton("Sleep (SCSI)")
+        self.refresh_button = QPushButton("Refresh")
         
         self.cleard_button.clicked.connect(self.clear_default)
         self.clearr_button.clicked.connect(self.clear_rescan)

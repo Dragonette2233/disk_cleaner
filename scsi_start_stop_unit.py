@@ -82,7 +82,7 @@ def send_scsi_command(drive_number, command, check=False):
         match err:
             case 32:
                 return 'CONFLICT'
-            case 2:
+            case 2 | 55:
                 return False
             case _:
                 open('sleep_err.txt', 'w+', encoding='utf-8').write(f'Err in sleep line 88: winerror {err}')
