@@ -228,6 +228,77 @@ def check_disk_power_state(drive_number):
     finally:
         CloseHandle(handle)
 
+# not is use
+def scsi_write_zeros_direct(disk_number, sector_offset, sector_count, sector_size=512):
+    """Использует IOCTL_SCSI_PASS_THROUGH_DIRECT для записи нулей в указанные сектора."""
+    disk_path = f"\\\\.\\PhysicalDrive{disk_number}"
+
+    h_disk = CreateFile(
+        disk_path,
+        GENERIC_WRITE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
+        None,
+        OPEN_EXISTING,
+        0,
+        None
+    )
+
+    if h_disk == wintypes.HANDLE(-1).value:
+        raise ctypes.WinError(ctypes.get_last_error())
+
+    try:
+        # Создаём буфер данных (нулевые байты)
+        data_length = sector_count * sector_size
+        data_buffer = (ctypes.c_ubyte * data_length)()
+
+        # Указатель на буфер
+        buffer_pointer = ctypes.cast(data_buffer, ctypes.POINTER(ctypes.c_ubyte))
+
+        # Формируем структуру SCSI_PASS_THROUGH_DIRECT
+        sptd = SCSI_PASS_THROUGH_DIRECT()
+        sptd.Length = ctypes.sizeof(SCSI_PASS_THROUGH_DIRECT)
+        sptd.ScsiStatus = 0
+        sptd.PathId = 0
+        sptd.TargetId = 0
+        sptd.Lun = 0
+        sptd.CdbLength = 10  # Длина CDB для команды WRITE(10)
+        sptd.SenseInfoLength = 0
+        sptd.DataIn = 0
+        sptd.DataTransferLength = data_length
+        sptd.TimeOutValue = 30  # Таймаут в секундах
+        sptd.DataBuffer = buffer_pointer
+        sptd.SenseInfoOffset = 0
+
+        # Формируем SCSI команду WRITE(10)
+        cdb = sptd.Cdb
+        cdb[0] = 0x2A  # WRITE(10)
+        cdb[2] = (sector_offset >> 24) & 0xFF
+        cdb[3] = (sector_offset >> 16) & 0xFF
+        cdb[4] = (sector_offset >> 8) & 0xFF
+        cdb[5] = sector_offset & 0xFF
+        cdb[7] = (sector_count >> 8) & 0xFF
+        cdb[8] = sector_count & 0xFF
+
+        # Выполняем DeviceIoControl
+        bytes_returned = wintypes.DWORD(0)
+        success = DeviceIoControl(
+            h_disk,
+            IOCTL_SCSI_PASS_THROUGH_DIRECT,
+            ctypes.byref(sptd),
+            ctypes.sizeof(sptd),
+            None,
+            0,
+            ctypes.byref(bytes_returned),
+            None
+        )
+
+        if not success:
+            raise ctypes.WinError(ctypes.get_last_error())
+
+        print(f"Секторы с {sector_offset} по {sector_offset + sector_count - 1} успешно очищены.")
+    finally:
+        CloseHandle(h_disk)
+
 
 def scsi_sleep_command(idxs):
     
@@ -241,5 +312,3 @@ def scsi_sleep_command(idxs):
 def is_disk_sleeping(drive_number):
 
     return send_scsi_command(drive_number, 0, check=True)
-
-# scsi_sleep_command(idxs=[1,])

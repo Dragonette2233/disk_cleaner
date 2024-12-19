@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (
     QListWidgetItem, QLabel, 
     QHBoxLayout, QPushButton, 
     QCheckBox, QMenu)
+import victoria_open_ctypes
 import threading
 import time
 from PyQt5.QtCore import QTimer, Qt
@@ -76,7 +77,8 @@ class DiskApp(QWidget):
         super().__init__()
         # Создаем основной компоновщик
         self.setWindowTitle("HHD-Handler")
-        self.layout = QVBoxLayout()
+        self.setMinimumSize(380, 385)
+        # self.layout = QVBoxLayout()
         self.icon = QIcon('lib\\hdd.ico')
         self.setWindowIcon(self.icon)
 
@@ -88,28 +90,59 @@ class DiskApp(QWidget):
             'checkbox': [mCheckBox(idx) for idx in range(10)]
         }
 
+         # Основной вертикальный компоновщик
+        self.main_layout = QVBoxLayout()
+        self._configure_markers_info()
+
+        # Создаем QListWidget
+        self.disk_list = QListWidget()
+        self.main_layout.addWidget(self.disk_list)
+
         # Кнопка для очистки разделов
         self.cleard_button = QPushButton("Clear DEFAULT")
         self.clearr_button = QPushButton("Clear RESCAN")
         self.eject_button = QPushButton("Sleep (SCSI)")
         self.refresh_button = QPushButton("Refresh")
-        
+        self.victoria_button = QPushButton("Victoria (8 wins)")
+        self.victoria_close_button = QPushButton("Victoria Close")
+
+        # # Устанавливаем компоновщик
+        # self.layout.addWidget(self.disk_list)
+        # self.layout.addWidget(self.cleard_button)
+        # self.layout.addWidget(self.clearr_button)
+        # self.layout.addWidget(self.eject_button)
+        # self.layout.addWidget(self.refresh_button)
+        # self.layout.addWidget(self.victoria_button)
+        # self.setLayout(self.layout)
+
+        # Подключаем события к кнопкам
         self.cleard_button.clicked.connect(self.clear_default)
         self.clearr_button.clicked.connect(self.clear_rescan)
         self.eject_button.clicked.connect(self.eject_device)
         self.refresh_button.clicked.connect(self.enable_refresh)
-        
-        self._configure_markers_info()
-        
+        self.victoria_button.clicked.connect(self.victoria_open)
+        self.victoria_close_button.clicked.connect(self.victoria_close)
 
-        
-        # Устанавливаем компоновщик
-        self.layout.addWidget(self.disk_list)
-        self.layout.addWidget(self.cleard_button)
-        self.layout.addWidget(self.clearr_button)
-        self.layout.addWidget(self.eject_button)
-        self.layout.addWidget(self.refresh_button)
-        self.setLayout(self.layout)
+        # Создаем горизонтальный компоновщик для кнопок Clear
+        clear_layout = QHBoxLayout()
+        clear_layout.addWidget(self.cleard_button)
+        clear_layout.addWidget(self.clearr_button)
+
+        # Создаем горизонтальный компоновщик для кнопок Victoria
+        victoria_layout = QHBoxLayout()
+        victoria_layout.addWidget(self.victoria_button)
+        victoria_layout.addWidget(self.victoria_close_button)
+
+        # Добавляем компоновки кнопок в основной вертикальный компоновщик
+        self.main_layout.addLayout(clear_layout)
+        self.main_layout.addLayout(victoria_layout)
+
+        # Остальные кнопки добавляем ниже
+        self.main_layout.addWidget(self.eject_button)
+        self.main_layout.addWidget(self.refresh_button)
+
+        # Устанавливаем основной компоновщик
+        self.setLayout(self.main_layout)
 
         # Устанавливаем заголовок и размеры окна
         
@@ -145,7 +178,11 @@ class DiskApp(QWidget):
         self.sleep_thr_timer = QTimer()
         self.sleep_thr_timer.timeout.connect(self.scsi_sleep_activity)
         
-        
+    def victoria_open(self):
+        victoria_open_ctypes.victoria_run()
+    
+    def victoria_close(self):
+        ...
 
     def clearing_activity(self):
         
@@ -153,8 +190,8 @@ class DiskApp(QWidget):
             self.clr_thr_timer.stop()
             self.cleard_button.setDisabled(False)
             self.clearr_button.setDisabled(False)
-            self.cleard_button.setText("Clear partitions (DEFAULT)")
-            self.clearr_button.setText("Clear partitions (RESCAN)")
+            self.cleard_button.setText("Clear DEFAULT")
+            self.clearr_button.setText("Clear RESCAN")
             self.cleard_button.setStyleSheet("color: white;")
             self.clearr_button.setStyleSheet("color: white;")
 
@@ -211,7 +248,7 @@ class DiskApp(QWidget):
 
 
         # Добавляем компоновщик с цветными кружками и текстом в основной макет окна
-        self.layout.addWidget(widget)
+        self.main_layout.addWidget(widget)
 
     def _colored_marker(self, color):
         mrk = QLabel()
@@ -281,7 +318,7 @@ class DiskApp(QWidget):
                     case p_info, model, 'CONFLICT':
                         model = model + ' (process conflict)'
                         cclr = 'orange'
-                    case 'UL' | 'NL' | 'NC', 'Not connected', False:
+                    case 'UL' | 'NL' | 'NC', 'Not connected' | "! Disconnected !", False:
                         cclr = 'red'
                     case 'EL', model, False:
                         cclr = 'yellow'
