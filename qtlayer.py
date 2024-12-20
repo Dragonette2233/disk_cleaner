@@ -177,9 +177,12 @@ class DiskApp(QWidget):
         self.scsi_sleep_thread: threading.Thread = None
         self.sleep_thr_timer = QTimer()
         self.sleep_thr_timer.timeout.connect(self.scsi_sleep_activity)
+
+        # self.victoriaa_thread = threading>ThreadData(target=self.victoria_open)
         
     def victoria_open(self):
-        victoria_open_ctypes.victoria_run()
+
+        threading.Thread(target=victoria_open_ctypes.victoria_run).start()
     
     def victoria_close(self):
         ...
