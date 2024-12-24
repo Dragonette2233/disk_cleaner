@@ -76,8 +76,8 @@ class DiskApp(QWidget):
     def __init__(self):
         super().__init__()
         # Создаем основной компоновщик
-        self.setWindowTitle("HHD-Handler")
-        self.setMinimumSize(380, 385)
+        self.setWindowTitle("HDD-Handler")
+        self.setMinimumSize(600, 385)
         # self.layout = QVBoxLayout()
         self.icon = QIcon('lib\\hdd.ico')
         self.setWindowIcon(self.icon)
@@ -104,16 +104,7 @@ class DiskApp(QWidget):
         self.eject_button = QPushButton("Sleep (SCSI)")
         self.refresh_button = QPushButton("Refresh")
         self.victoria_button = QPushButton("Victoria (8 wins)")
-        self.victoria_close_button = QPushButton("Victoria Close")
-
-        # # Устанавливаем компоновщик
-        # self.layout.addWidget(self.disk_list)
-        # self.layout.addWidget(self.cleard_button)
-        # self.layout.addWidget(self.clearr_button)
-        # self.layout.addWidget(self.eject_button)
-        # self.layout.addWidget(self.refresh_button)
-        # self.layout.addWidget(self.victoria_button)
-        # self.setLayout(self.layout)
+        self.victoria_close_button = QPushButton("-__-")
 
         # Подключаем события к кнопкам
         self.cleard_button.clicked.connect(self.clear_default)
@@ -203,7 +194,7 @@ class DiskApp(QWidget):
         if not self.scsi_sleep_thread.is_alive():
             self.sleep_thr_timer.stop()
             self.eject_button.setDisabled(False)
-            self.eject_button.setText("Send sleep command (SCSI)")
+            self.eject_button.setText("Sleep (SCSI)")
             self.eject_button.setStyleSheet("color: white;")
 
     def _configure_markers_info(self):
@@ -222,12 +213,12 @@ class DiskApp(QWidget):
         
         # Добавляем кружочки и текст к каждому индикатору
         h_layout.addWidget(green_mrk)
-        h_layout.addWidget(QLabel("w/o partitions"))
+        h_layout.addWidget(QLabel("w/o parts"))
 
         h_layout.addSpacing(10)  # Расстояние между кружочками
 
         h_layout.addWidget(yellow_mrk)
-        h_layout.addWidget(QLabel("with partitions"))
+        h_layout.addWidget(QLabel("with parts"))
 
         h_layout.addSpacing(10)  # Расстояние между кружочками
 
@@ -327,14 +318,8 @@ class DiskApp(QWidget):
                         cclr = 'yellow'
                     case 'NL', model, False:
                         cclr = 'green'
-                    case 'CRC' | 'IO' | 'OUT', model, False:
-                        if p_info == 'CRC':
-                            model = model + ' (CRC)'
-                        elif p_info == 'IO':
-                            model = model + ' (I/O)'
-                        elif p_info == 'OUT':
-                            model = model + ' (Disconnected)'
-                        
+                    case 'CRC' | 'IO' | 'OUT' as e, model, is_sleep:
+                        model = model + f' ({e})'
                         cclr = 'orange'
                     case p_info, model, True:
                          # print(p_info, model, is_sleep)

@@ -3,12 +3,12 @@ import subprocess
 import time
 import ctypes
 from ctypes import wintypes
-import psutil
 import win32gui
 
-# Путь к программе Victoria
-VICTORIA_PATH = r"C:\\Users\\DSP\\Desktop\\Victoria537\\Victoria.exe"
-CONFIG_PATH = r"C:\\Users\\DSP\\Desktop\\Victoria537\\Victoria.ini"
+PATH = open('victoriapath', 'r', encoding='utf-8').readlines()
+
+VICTORIA_PATH = PATH[0].strip()
+CONFIG_PATH = PATH[1].strip()
 
 # Определение ctypes функций Windows API
 user32 = ctypes.WinDLL('user32', use_last_error=True)
@@ -134,7 +134,3 @@ def victoria_run():
                 print(f"Не удалось переместить окно PID {proc.pid}, HWND {hwnd}")
         else:
             print(f"Окно не найдено для процесса PID {proc.pid}")
-
-
-
-# print("Все окна размещены.")

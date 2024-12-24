@@ -13,13 +13,18 @@ subdirectory that contains the files needed to run the application
 from __future__ import annotations
 
 from cx_Freeze import Executable, setup
+import os
+import pywin32_system32
 
 try:
     from cx_Freeze.hooks import get_qt_plugins_paths
 except ImportError:
     get_qt_plugins_paths = None
 
-include_files = []
+include_files = [
+    os.path.join("C:\py-wf\disk_cleaner\.env\Lib\site-packages\pywin32_system32", "pywintypes312.dll"),
+    'victoriapath'
+]
 if get_qt_plugins_paths:
     # Inclusion of extra plugins (since cx_Freeze 6.8b2)
     # cx_Freeze automatically imports the following plugins depending on the
@@ -29,6 +34,7 @@ if get_qt_plugins_paths:
 build_exe_options = {
     # exclude packages that are not really needed
     "excludes": ["tkinter", "unittest", "email", "http", "xml", "pydoc"],
+    "includes": ["win32gui"],
     "include_files": include_files,
     "include_msvcr": True,
 }
@@ -41,11 +47,11 @@ bdist_dmg_options = {
     "volume_label": "TEST",
 }
 
-executables = [Executable("main.py", base="gui", icon="hdd.ico", target_name='dlc')]
+executables = [Executable("main.py", base="gui", icon="hdd.ico", target_name='hddc')]
 
 setup(
     name="HDD-Handler",
-    version="1.2",
+    version="1.33",
     description="HDD-Handler",
     options={
         "build_exe": build_exe_options,

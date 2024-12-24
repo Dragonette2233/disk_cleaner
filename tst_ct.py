@@ -1,28 +1,23 @@
-import sys
-import win32gui
 
-def callback(hwnd, strings):
-    if win32gui.IsWindowVisible(hwnd):
-        window_title = win32gui.GetWindowText(hwnd)
-        left, top, right, bottom = win32gui.GetWindowRect(hwnd)
-        if window_title and right-left and bottom-top:
-            strings.append('0x{:08x}: "{}"'.format(hwnd, window_title))
-    return True
+model = None
+p_info = 'CRC'
+model = 'ST9000MN1'
+is_sleep = True
 
-def count_of_victoria_wins():
-    count = 0
-    def callback(hwnd, strings):
-        if win32gui.IsWindowVisible(hwnd):
-            window_title = win32gui.GetWindowText(hwnd)
-            left, top, right, bottom = win32gui.GetWindowRect(hwnd)
-            if window_title and right-left and bottom-top:
-                strings.append('0x{:08x}: "{}"'.format(hwnd, window_title))
-        return True
-    win_list = []  # list of strings containing win handles and window titles
-    win32gui.EnumWindows(callback, win_list)  # populate list
+match p_info, model, is_sleep:
+    case p_info, model, 'IO':
+        model = model + ' (I/O)'
+        cclr = 'orange'
+    case p_info, model, 'CONFLICT':
+        model = model + ' (process conflict)'
+        cclr = 'orange'
+    case 'UL' | 'NL' | 'NC', 'Not connected' | "! Disconnected !", False:
+        cclr = 'red'
+    case 'EL', model, False:
+        cclr = 'yellow'
+    case 'NL', model, False:
+        cclr = 'green'
+    case 'CRC' | 'IO' | 'OUT' as e, model, True:
+        model = model + f' ({e})'
 
-    for window in win_list:  # print results
-        if window.split('"')[1].startswith(" Victoria 5.37 HDD/SSD"):
-            count += 1
-
-    return count
+print(model)

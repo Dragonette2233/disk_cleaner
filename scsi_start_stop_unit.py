@@ -63,10 +63,10 @@ CloseHandle = kernel32.CloseHandle
 CloseHandle.argtypes = [wintypes.HANDLE]
 CloseHandle.restype = wintypes.BOOL
 
-def send_scsi_command(drive_number, command, check=False):
-    drive_path = f"\\\\.\\PhysicalDrive{drive_number}"
-
+def get_disk_handle(drive_number):
     # Открытие устройства
+
+    drive_path = f"\\\\.\\PhysicalDrive{drive_number}"
     handle = CreateFile(
         drive_path,
         GENERIC_READ | GENERIC_WRITE,
@@ -87,6 +87,14 @@ def send_scsi_command(drive_number, command, check=False):
             case _:
                 open('sleep_err.txt', 'w+', encoding='utf-8').write(f'Err in sleep line 88: winerror {err}')
                 raise ctypes.WinError(err, f"Не удалось открыть диск {drive_path}")
+        
+    return handle
+
+def send_scsi_command(drive_number, command, check=False):
+
+
+    
+    handle = get_disk_handle(drive_number)
 
     try:
         # Настройка структуры SCSI_PASS_THROUGH_DIRECT
@@ -146,18 +154,11 @@ def send_scsi_command(drive_number, command, check=False):
         if check:
             # Анализ данных sense buffer
             additional_sense_code = data_buffer[16] == 0
-            # print(data_buffer[16])
-            # usb_flash_code = data_buffer[2] == 2
-
-            # print(f"Sense Data: {[hex(x) for x in data_buffer]}")
-            # print(additional_sense_code)
-            # if usb_flash_code:
-               #  return False
             if additional_sense_code:
-                # print(f"Диск {drive_number} находится в режиме энергосбережения (standby).")
+                # in sleep
                 return True
             else:
-                # print(f"Диск {drive_number} активен.")
+                # normal mode
                 return False
 
     finally:
@@ -165,19 +166,9 @@ def send_scsi_command(drive_number, command, check=False):
 
 
 def check_disk_power_state(drive_number):
-    drive_path = f"\\\\.\\PhysicalDrive{drive_number}"
+    # drive_path = f"\\\\.\\PhysicalDrive{drive_number}"
 
-    handle = CreateFile(
-        drive_path,
-        GENERIC_READ | GENERIC_WRITE,
-        FILE_SHARE_READ | FILE_SHARE_WRITE,
-        None,
-        OPEN_EXISTING,
-        0,
-        None,
-    )
-    if handle == wintypes.HANDLE(-1).value:
-        raise ctypes.WinError(ctypes.get_last_error(), f"Не удалось открыть диск {drive_path}")
+    handle = get_disk_handle(drive_number)
 
     try:
         # Настройка структуры SCSI_PASS_THROUGH_DIRECT
@@ -231,20 +222,7 @@ def check_disk_power_state(drive_number):
 # not is use
 def scsi_write_zeros_direct(disk_number, sector_offset, sector_count, sector_size=512):
     """Использует IOCTL_SCSI_PASS_THROUGH_DIRECT для записи нулей в указанные сектора."""
-    disk_path = f"\\\\.\\PhysicalDrive{disk_number}"
-
-    h_disk = CreateFile(
-        disk_path,
-        GENERIC_WRITE,
-        FILE_SHARE_READ | FILE_SHARE_WRITE,
-        None,
-        OPEN_EXISTING,
-        0,
-        None
-    )
-
-    if h_disk == wintypes.HANDLE(-1).value:
-        raise ctypes.WinError(ctypes.get_last_error())
+    h_disk = get_disk_handle(disk_number)
 
     try:
         # Создаём буфер данных (нулевые байты)
