@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
     QCheckBox, QMenu,
     QFileDialog, QMessageBox,)
 from functools import partial
+from victoria_open_ctypes import VICTORIA_PATH, CONFIG_PATH
 import victoria_open_ctypes
 import threading
 import time
@@ -208,7 +209,8 @@ class DiskApp(QWidget):
         # self.victoriaa_thread = threading>ThreadData(target=self.victoria_open)
         
     def victoria_open(self, connected=8):
-        
+        global VICTORIA_PATH, CONFIG_PATH
+
         if connected == 8:
             l = range(1, 9)
         elif connected == 1:
@@ -224,21 +226,21 @@ class DiskApp(QWidget):
         
         print(l)
 
-        if not os.path.exists(victoria_open_ctypes.VICTORIA_PATH):
-            print(victoria_open_ctypes.VICTORIA_PATH)
+        if not os.path.exists(VICTORIA_PATH):
+            print(VICTORIA_PATH)
             options = QFileDialog.Options()
             options |= QFileDialog.ReadOnly
             file_path, _ = QFileDialog.getOpenFileName(
                 self,
-                "Выберите файл Victoria",
+                "Chose Victoria file",
                 "",
-                "Исполняемые файлы (*.exe);;Все файлы (*)",
+                "Executable (*.exe);;All files (*)",
                 options=options
             )
-
+            # print(file_path)
             if file_path:
                 ini_path = file_path.replace('.exe', '.ini')
-                full_path = file_path + '\n' + ini_path
+                full_path = (file_path + '\n' + ini_path).replace('/', '\\')
                 try:
                     # Проверка, что выбран файл с расширением .exe
                     if not file_path.endswith(".exe"):
@@ -249,7 +251,10 @@ class DiskApp(QWidget):
                     with open(config_path, "w") as file:
                         file.write(full_path)
 
-                    QMessageBox.information(self, "Успех", f"Путь к Victoria сохранён:\n{file_path}")
+
+                    # print('cfg and exe', VICTORIA_PATH + CONFIG_PATH)
+
+                    QMessageBox.information(self, "Done", f"Victoria path saved.\n{full_path}\n\nRestart required")
                 except Exception as e:
                     QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить путь: {str(e)}")
 
@@ -404,11 +409,11 @@ class DiskApp(QWidget):
 
 
     def refresh_disk_info(self):
-        # if self.is_refresh_highlighted:
-        #     self.refresh_label.setStyleSheet("font-size: 14px; font-weight: bold; background-color: #2652D6; color: #2652D6;")
-        # else:
-        #     self.refresh_label.setStyleSheet("font-size: 14px; font-weight: bold; background-color: #5C65D6; color: #5C65D6;")
-        # self.is_refresh_highlighted = not self.is_refresh_highlighted
+            # if self.is_refresh_highlighted:
+            #     self.refresh_label.setStyleSheet("font-size: 14px; font-weight: bold; background-color: #2652D6; color: #2652D6;")
+            # else:
+            #     self.refresh_label.setStyleSheet("font-size: 14px; font-weight: bold; background-color: #5C65D6; color: #5C65D6;")
+            # self.is_refresh_highlighted = not self.is_refresh_highlighted
 
         if self.thread_data.is_refresh_require:
             try:
