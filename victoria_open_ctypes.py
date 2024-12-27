@@ -96,20 +96,22 @@ def count_of_victoria_wins():
 
 def victoria_run(connected):
     # Проверка существования программы
-    if not os.path.exists(VICTORIA_PATH):
-        raise FileNotFoundError(f"Программа не найдена по пути: {VICTORIA_PATH}")
+    # if not os.path.exists(VICTORIA_PATH):
+    #     raise FileNotFoundError(f"Программа не найдена по пути: {VICTORIA_PATH}")
 
     # Открытие 8 экземпляров программы
     processes = []
     for i in connected:
         update_last_api_device(i)
+        print(i)
         proc = subprocess.Popen(VICTORIA_PATH)
         while count_of_victoria_wins() < i:
-            time.sleep(0.1)
+            time.sleep(0.3)
+            # print('ulala')
         processes.append(proc)
         time.sleep(1)  # Небольшая задержка для запуска экземпляра
 
-
+    print(processes)
         # Начальные координаты и шаг
     START_X, START_Y = 50, 25
     STEP_X, STEP_Y = 24, 71
@@ -134,3 +136,5 @@ def victoria_run(connected):
                 print(f"Не удалось переместить окно PID {proc.pid}, HWND {hwnd}")
         else:
             print(f"Окно не найдено для процесса PID {proc.pid}")
+    
+    print('lll')

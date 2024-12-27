@@ -47,11 +47,11 @@ bdist_dmg_options = {
     "volume_label": "TEST",
 }
 
-executables = [Executable("main.py", base="gui", icon="hdd.ico", target_name='hddc')]
+executables = [Executable("main.py", base="gui", icon="hddc.ico", target_name='hddc')]
 
 setup(
     name="HDD-Handler",
-    version="1.33",
+    version="1.34",
     description="HDD-Handler",
     options={
         "build_exe": build_exe_options,

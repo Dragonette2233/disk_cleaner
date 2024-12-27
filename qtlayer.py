@@ -3,7 +3,8 @@ from PyQt5.QtWidgets import (
     QListWidget, QVBoxLayout, 
     QListWidgetItem, QLabel, 
     QHBoxLayout, QPushButton, 
-    QCheckBox, QMenu)
+    QCheckBox, QMenu,
+    QFileDialog, QMessageBox,)
 from functools import partial
 import victoria_open_ctypes
 import threading
@@ -14,6 +15,7 @@ from scsi_start_stop_unit import scsi_sleep_command, is_disk_sleeping
 import queue
 import sys
 import diskutils as du
+import os
         
 class ThreadData:
     def __init__(self) -> None:
@@ -78,9 +80,9 @@ class DiskApp(QWidget):
         super().__init__()
         # Создаем основной компоновщик
         self.setWindowTitle("HDD-Handler")
-        self.setMinimumSize(600, 385)
+        self.setMinimumSize(600, 360)
         # self.layout = QVBoxLayout()
-        self.icon = QIcon('hdd.ico')
+        self.icon = QIcon('hddc.ico')
         self.setWindowIcon(self.icon)
 
         # Создаем QListWidget
@@ -93,25 +95,35 @@ class DiskApp(QWidget):
 
          # Основной вертикальный компоновщик
         self.main_layout = QVBoxLayout()
+        
+
+        # Добавляем лейбл "Refresh activity" в верхней части окна
+        
+        
         self._configure_markers_info()
+        # Горизонтальный компоновщик для верхней части
+        
+
+        # Добавляем верхний лейаут в основной
+        
 
         # Создаем QListWidget
         self.disk_list = QListWidget()
         self.main_layout.addWidget(self.disk_list)
 
         # Кнопка для очистки разделов
-        self.cleard_button = QPushButton("Clear DEFAULT")
-        self.clearr_button = QPushButton("Clear RESCAN")
+        self.cleard_button = QPushButton("DP Clear DEFAULT")
+        self.clearr_button = QPushButton("DP Clear RESCAN")
         self.eject_button = QPushButton("Sleep (SCSI)")
-        self.refresh_button = QPushButton("Refresh")
+        # self.refresh_button = QPushButton("Refresh")
         self.victoria_button = QPushButton("Victoria (8 wins)")
-        self.victoria_close_button = QPushButton("Victoria (Avaliable disks)")
+        self.victoria_close_button = QPushButton("Victoria (avaliable disks)")
 
         # Подключаем события к кнопкам
         self.cleard_button.clicked.connect(self.clear_default)
         self.clearr_button.clicked.connect(self.clear_rescan)
         self.eject_button.clicked.connect(self.eject_device)
-        self.refresh_button.clicked.connect(self.enable_refresh)
+        # self.refresh_button.clicked.connect(self.enable_refresh)
         self.victoria_button.clicked.connect(partial(self.victoria_open, 8))
         self.victoria_close_button.clicked.connect(partial(self.victoria_open, 1))
 
@@ -131,7 +143,28 @@ class DiskApp(QWidget):
 
         # Остальные кнопки добавляем ниже
         self.main_layout.addWidget(self.eject_button)
-        self.main_layout.addWidget(self.refresh_button)
+        # self.main_layout.addWidget(self.refresh_button)
+
+        # # Добавляем лейбл "Refresh activity" внизу
+        # self.refresh_label = QLabel("Refresh activity")
+        # self.refresh_label.setAlignment(Qt.AlignCenter)
+        # self.refresh_label.setStyleSheet("font-size: 10px; background-color: #555; color: #FFF;")
+        # self.main_layout.addWidget(self.refresh_label)
+        # self.is_refresh_highlighted = False  # Флаг состояния цвета лейбла
+
+        # self.refresh_label = QLabel("R")
+        # self.refresh_label.setFixedSize(20, 20)  # Размер круга 20x20
+        # self.refresh_label.setStyleSheet("""
+        #     background-color: #2652D6;
+        #     border-radius: 10px;  /* Делает лейбл круглым */
+        #     border: 1px solid #333;
+        # """)
+        # self.is_refresh_highlighted = False
+
+        # top_layout = QHBoxLayout()
+        # top_layout.addWidget(self.refresh_label, alignment=Qt.AlignLeft)  # Лейбл выравнен влево
+        # top_layout.addStretch()  # Добавляем пространство для выравнивания
+        # self.main_layout.addLayout(top_layout)
 
         # Устанавливаем основной компоновщик
         self.setLayout(self.main_layout)
@@ -156,11 +189,12 @@ class DiskApp(QWidget):
         # Запускаем таймер для обновления информации каждые 2 секунды
         self.timer = QTimer()
         self.timer.timeout.connect(self.refresh_disk_info)
+        self.timer.start(500)
 
         # Первая инициализация информации о дисках
         self.thread_data.update()
         self.refresh_disk_info()
-        self.enable_refresh()
+        # self.enable_refresh()
         
         self.update_thread = threading.Thread(target=self.run_update_thread, daemon=True).start()
         self.clearing_thread: threading.Thread = None
@@ -187,8 +221,71 @@ class DiskApp(QWidget):
                         l.append(i)
                 
             l = tuple(l)
+        
+        print(l)
 
-        threading.Thread(target=victoria_open_ctypes.victoria_run, args=(l, ), daemon=True).start()
+        if not os.path.exists(victoria_open_ctypes.VICTORIA_PATH):
+            print(victoria_open_ctypes.VICTORIA_PATH)
+            options = QFileDialog.Options()
+            options |= QFileDialog.ReadOnly
+            file_path, _ = QFileDialog.getOpenFileName(
+                self,
+                "Выберите файл Victoria",
+                "",
+                "Исполняемые файлы (*.exe);;Все файлы (*)",
+                options=options
+            )
+
+            if file_path:
+                ini_path = file_path.replace('.exe', '.ini')
+                full_path = file_path + '\n' + ini_path
+                try:
+                    # Проверка, что выбран файл с расширением .exe
+                    if not file_path.endswith(".exe"):
+                        raise ValueError("Выберите исполняемый файл (.exe).")
+
+                    # Сохранение пути в файл
+                    config_path = "victoriapath"  # Укажите путь к файлу для сохранения пути
+                    with open(config_path, "w") as file:
+                        file.write(full_path)
+
+                    QMessageBox.information(self, "Успех", f"Путь к Victoria сохранён:\n{file_path}")
+                except Exception as e:
+                    QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить путь: {str(e)}")
+
+        else:
+            print('victoria found. Running')
+            threading.Thread(target=victoria_open_ctypes.victoria_run, args=(l, ), daemon=True).start()
+        # return
+
+
+
+        # options = QFileDialog.Options()
+        # options |= QFileDialog.ReadOnly
+        # file_path, _ = QFileDialog.getOpenFileName(
+        #     self,
+        #     "Выберите файл Victoria",
+        #     "",
+        #     "Исполняемые файлы (*.exe);;Все файлы (*)",
+        #     options=options
+        # )
+
+        # if file_path:
+        #     try:
+        #         # Проверка, что выбран файл с расширением .exe
+        #         if not file_path.endswith(".exe"):
+        #             raise ValueError("Выберите исполняемый файл (.exe).")
+
+        #         # Сохранение пути в файл
+        #         config_path = "victoriapath"  # Укажите путь к файлу для сохранения пути
+        #         with open(config_path, "w") as file:
+        #             file.write(file_path)
+
+        #         QMessageBox.information(self, "Успех", f"Путь к Victoria сохранён:\n{file_path}")
+        #     except Exception as e:
+        #         QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить путь: {str(e)}")
+
+        # threading.Thread(target=victoria_open_ctypes.victoria_run, args=(l, ), daemon=True).start()
     
     def victoria_close(self):
         ...
@@ -266,13 +363,13 @@ class DiskApp(QWidget):
         return mrk
 
     
-    def enable_refresh(self):
-        if not self.timer.isActive():
-            self.timer.start(500) 
-            self.refresh_button.setStyleSheet("color: #41C871;")
-        else:
-            self.refresh_button.setStyleSheet("color: #FFFFFF;")
-            self.timer.stop()
+    # def enable_refresh(self):
+    #     if not self.timer.isActive():
+    #         self.timer.start(500)
+    #         # self.refresh_button.setStyleSheet("color: #41C871;")
+    #     else:
+    #         # self.refresh_button.setStyleSheet("color: #FFFFFF;")
+    #         self.timer.stop()
     
     def run_update_thread(self):
 
@@ -307,6 +404,12 @@ class DiskApp(QWidget):
 
 
     def refresh_disk_info(self):
+        # if self.is_refresh_highlighted:
+        #     self.refresh_label.setStyleSheet("font-size: 14px; font-weight: bold; background-color: #2652D6; color: #2652D6;")
+        # else:
+        #     self.refresh_label.setStyleSheet("font-size: 14px; font-weight: bold; background-color: #5C65D6; color: #5C65D6;")
+        # self.is_refresh_highlighted = not self.is_refresh_highlighted
+
         if self.thread_data.is_refresh_require:
             try:
                 disk_info = self.thread_data.queue.get_nowait()
