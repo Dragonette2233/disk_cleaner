@@ -94,14 +94,14 @@ def count_of_victoria_wins():
 
     return count
 
-def victoria_run():
+def victoria_run(connected):
     # Проверка существования программы
     if not os.path.exists(VICTORIA_PATH):
         raise FileNotFoundError(f"Программа не найдена по пути: {VICTORIA_PATH}")
 
     # Открытие 8 экземпляров программы
     processes = []
-    for i in range(1, 9):
+    for i in connected:
         update_last_api_device(i)
         proc = subprocess.Popen(VICTORIA_PATH)
         while count_of_victoria_wins() < i:

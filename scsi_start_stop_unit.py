@@ -149,7 +149,6 @@ def send_scsi_command(drive_number, command, check=False):
             if check:
                 return 'IO'
             return False
-            # raise ctypes.WinError(ctypes.get_last_error(), "Ошибка выполнения DeviceIoControl")
 
         if check:
             # Анализ данных sense buffer

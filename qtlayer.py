@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (
     QListWidgetItem, QLabel, 
     QHBoxLayout, QPushButton, 
     QCheckBox, QMenu)
+from functools import partial
 import victoria_open_ctypes
 import threading
 import time
@@ -79,7 +80,7 @@ class DiskApp(QWidget):
         self.setWindowTitle("HDD-Handler")
         self.setMinimumSize(600, 385)
         # self.layout = QVBoxLayout()
-        self.icon = QIcon('lib\\hdd.ico')
+        self.icon = QIcon('hdd.ico')
         self.setWindowIcon(self.icon)
 
         # Создаем QListWidget
@@ -104,15 +105,15 @@ class DiskApp(QWidget):
         self.eject_button = QPushButton("Sleep (SCSI)")
         self.refresh_button = QPushButton("Refresh")
         self.victoria_button = QPushButton("Victoria (8 wins)")
-        self.victoria_close_button = QPushButton("-__-")
+        self.victoria_close_button = QPushButton("Victoria (Avaliable disks)")
 
         # Подключаем события к кнопкам
         self.cleard_button.clicked.connect(self.clear_default)
         self.clearr_button.clicked.connect(self.clear_rescan)
         self.eject_button.clicked.connect(self.eject_device)
         self.refresh_button.clicked.connect(self.enable_refresh)
-        self.victoria_button.clicked.connect(self.victoria_open)
-        self.victoria_close_button.clicked.connect(self.victoria_close)
+        self.victoria_button.clicked.connect(partial(self.victoria_open, 8))
+        self.victoria_close_button.clicked.connect(partial(self.victoria_open, 1))
 
         # Создаем горизонтальный компоновщик для кнопок Clear
         clear_layout = QHBoxLayout()
@@ -150,6 +151,7 @@ class DiskApp(QWidget):
         self.resize(550, 340)
 
         self.thread_data = ThreadData()
+        self.clipboard = QApplication.clipboard()
 
         # Запускаем таймер для обновления информации каждые 2 секунды
         self.timer = QTimer()
@@ -171,9 +173,22 @@ class DiskApp(QWidget):
 
         # self.victoriaa_thread = threading>ThreadData(target=self.victoria_open)
         
-    def victoria_open(self):
+    def victoria_open(self, connected=8):
+        
+        if connected == 8:
+            l = range(1, 9)
+        elif connected == 1:
+            l = []
+            for i, m in enumerate(self.disk_labels['model']):
+                # print(i)
+                if i != 0:
+                    model: str = m.text().split()[1].strip()
+                    if not model.startswith(("Not", "! ")):
+                        l.append(i)
+                
+            l = tuple(l)
 
-        threading.Thread(target=victoria_open_ctypes.victoria_run).start()
+        threading.Thread(target=victoria_open_ctypes.victoria_run, args=(l, ), daemon=True).start()
     
     def victoria_close(self):
         ...
@@ -274,6 +289,7 @@ class DiskApp(QWidget):
         action_clear_d = context_menu.addAction("Clear (Default)")
         action_clear_r = context_menu.addAction("Clear (Rescan)")
         action_sleep = context_menu.addAction("Send sleep")
+        action_copy = context_menu.addAction("Copy")
 
         # Отображаем меню в позиции курсора
         action = context_menu.exec_(lb.mapToGlobal(position))
@@ -285,6 +301,10 @@ class DiskApp(QWidget):
             self.clear_rescan(single_idx=idx)
         elif action == action_sleep:
             threading.Thread(target=scsi_sleep_command, args=((idx, ), ), daemon=True).start()
+        elif action == action_copy:
+            disk_model = ' '.join(lb.text().split()[1:]).strip()
+            self.clipboard.setText(disk_model)
+
 
     def refresh_disk_info(self):
         if self.thread_data.is_refresh_require:
