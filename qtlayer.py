@@ -4,13 +4,14 @@ from PyQt5.QtWidgets import (
     QListWidgetItem, QLabel, 
     QHBoxLayout, QPushButton, 
     QCheckBox, QMenu,
-    QFileDialog, QMessageBox,)
+    QFileDialog, QMessageBox,
+    QToolTip)
 from functools import partial
 from victoria_open_ctypes import VICTORIA_PATH, CONFIG_PATH
 import victoria_open_ctypes
 import threading
 import time
-from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtCore import QTimer, Qt, QPoint
 from PyQt5.QtGui import QIcon
 from scsi_start_stop_unit import scsi_sleep_command, is_disk_sleeping
 import smart_check
@@ -66,11 +67,54 @@ class mModel(QLabel):
         self.setContextMenuPolicy(Qt.CustomContextMenu)  # Включаем поддержку пользовательского контекстного меню
         self.customContextMenuRequested.connect(lambda: self.parent_.show_context_menu(self, idx))
 
+class PersistentToolTip(QLabel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.ToolTip)
+        self.setStyleSheet("""
+            QLabel {
+                background-color: #333;  /* Темный фон */
+                color: white;            /* Белый текст */
+                border: 1px solid white; /* Белая рамка */
+                padding: 5px;            /* Небольшие внутренние отступы */
+                text-align: justify;     /* Выровнять по ширине */
+            }
+        """)
+        self.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.hide()
+
+    def show_at(self, text, pos):
+        self.setText(text)
+        self.adjustSize()  # Автоматическое изменение размера для текста
+        self.move(pos)
+        self.show()
+
 class mSmart(QLabel):
-    def __init__(self):
+    def __init__(self, smart_complex=None):
         super().__init__()
         self.setStyleSheet("color: #3BF4FA;")
-    
+        self.smart_complex = ""
+        self.tooltip = PersistentToolTip(self)
+        self.setMouseTracking(True)
+
+    def enterEvent(self, event):
+        if self.smart_complex:
+            self.tooltip.show_at(self.smart_complex, event.globalPos() + QPoint(10, 10))
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.tooltip.hide()
+        super().leaveEvent(event)
+
+    def d_update(self, text):
+        self.smart_complex = text
+
+    def d_reset(self):
+        self.smart_complex = ""
+        self.setStyleSheet("color: #3BF4FA;")
+        self.setText("[smart data]")
+
+        
 class mSerial(QLabel):
     def __init__(self):
         super().__init__()
@@ -226,10 +270,10 @@ class DiskApp(QWidget):
                 
             l = tuple(l)
         
-        print(l)
+        # print(l)
 
         if not os.path.exists(VICTORIA_PATH):
-            print(VICTORIA_PATH)
+            # print(VICTORIA_PATH)
             options = QFileDialog.Options()
             options |= QFileDialog.ReadOnly
             file_path, _ = QFileDialog.getOpenFileName(
@@ -425,7 +469,7 @@ class DiskApp(QWidget):
 
             self.disk_labels['model'][i].setStyleSheet("color: %s;" % 'red')  # Установка цвета для модели
 
-            self.disk_labels['smart'][i].setText("0p0u0")
+            self.disk_labels['smart'][i].setText("[smart data]")
             # Создаем метку для серийного номера
             self.disk_labels['serial'][i].setText("S/N: ")
 
@@ -444,31 +488,42 @@ class DiskApp(QWidget):
             self.disk_list.setItemWidget(item, widget)  # Устанавливаем виджет для элемента
 
     def push_smart(self):
-        smarts = smart_check.get_short_smarts()
-        short_sm, complex_sm = smarts
-        self.thread_data.smart_queue.put(short_sm)
+        smarts: list[list] = smart_check.get_short_smarts()
+        # print(smarts)
+        self.thread_data.smart_queue.put(smarts)
     
     def refresh_smart_info(self):
         
         try:
-            smart_info = self.thread_data.smart_queue.get_nowait()
+            short_sm, complex_sm = self.thread_data.smart_queue.get_nowait()
         except queue.Empty:
             return
         
-        for i, inf in enumerate(smart_info):
+        for i, inf in enumerate(short_sm):
             
             if len(inf) >= 1:
                 self.disk_labels['smart'][i].setText(inf)
+                self.disk_labels['smart'][i].d_update(complex_sm[i])
+                
                 
                 
                 bads = int(inf.split('p')[0])
-
+                # bads = 1
+                if len(inf) >= 2:
+                    usc = int(inf.split('u')[1])
+                    pendings = int(inf.replace('p', '_').replace('u', '_').split('_')[1])
+                    
+                    if usc > 0 or pendings > 0:
+                        self.disk_labels['smart'][i].setStyleSheet("color: #8BF011;")
+                                                
+                
                 if bads > 0:
                     self.disk_labels['smart'][i].setStyleSheet("color: #F7A116;")
-                    if bads > 20:
-                        self.disk_labels['smart'][i].setStyleSheet("color: #F74D16;")
                     
-                else:
+                if bads > 20:
+                    self.disk_labels['smart'][i].setStyleSheet("color: #F74D16;")
+                        
+                if inf == '0p0u0' or inf == '0':
                     self.disk_labels['smart'][i].setStyleSheet("color: #16F76E;")
 
             
@@ -500,6 +555,8 @@ class DiskApp(QWidget):
                         cclr = 'orange'
                     case 'UL' | 'NL' | 'NC', 'Not connected' | "! Disconnected !", False:
                         cclr = 'red'
+                        self.disk_labels['model'][i].setStyleSheet("color: #3BF4FA;")
+                        self.disk_labels['model'][i].setText("[smart data]")
                     case 'EL', model, False:
                         cclr = 'yellow'
                     case 'NL', model, False:
@@ -520,7 +577,7 @@ class DiskApp(QWidget):
 
                 # Создаем метку для модели
                 self.disk_labels['model'][i].setText(f"[{i}]  " + model)
-                print(self.disk_labels['model'][i].text())
+                # print(self.disk_labels['model'][i].text())
                 
 
                 clr_m = "red" if model == 'Not connected' else '#27C4E2'
@@ -580,7 +637,7 @@ class DiskApp(QWidget):
             self.cleard_button.setDisabled(True)
             self.clearr_button.setText("CLEARING PARTITIONS...")
             self.clearr_button.setStyleSheet("color: #DC93CD")
-            print("Selected partitions to clear:", selected_indices)
+            # print("Selected partitions to clear:", selected_indices)
 
     def clear_default(self, single_idx=False):
         selected_indices = self.gather_indices()
@@ -597,7 +654,7 @@ class DiskApp(QWidget):
             self.clearr_button.setDisabled(True)
             self.cleard_button.setText("CLEARING PARTITIONS...")
             self.cleard_button.setStyleSheet("color: #DC93CD")
-            print("Selected partitions to clear:", selected_indices)
+            # print("Selected partitions to clear:", selected_indices)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
