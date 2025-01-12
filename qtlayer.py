@@ -13,6 +13,7 @@ import time
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QIcon
 from scsi_start_stop_unit import scsi_sleep_command, is_disk_sleeping
+import smart_check
 import queue
 import sys
 import diskutils as du
@@ -25,7 +26,8 @@ class ThreadData:
         self.cache_part_sequence = ''
         self.cache_connected_drives = 0
         self.is_refresh_require = False
-        self.queue = queue.Queue()
+        self.disks_queue = queue.Queue()
+        self.smart_queue = queue.Queue()
     
     def update(self):
         n_connected_drives = 0
@@ -51,7 +53,7 @@ class ThreadData:
         ])
 
         if self.is_refresh_require:
-            self.queue.put(self.disk_info.copy())
+            self.disks_queue.put(self.disk_info.copy())
             self.cache_connected_drives = n_connected_drives
             self.cache_part_sequence = n_part_sequence
             return True
@@ -63,6 +65,11 @@ class mModel(QLabel):
         super().__init__()
         self.setContextMenuPolicy(Qt.CustomContextMenu)  # Включаем поддержку пользовательского контекстного меню
         self.customContextMenuRequested.connect(lambda: self.parent_.show_context_menu(self, idx))
+
+class mSmart(QLabel):
+    def __init__(self):
+        super().__init__()
+        self.setStyleSheet("color: #3BF4FA;")
     
 class mSerial(QLabel):
     def __init__(self):
@@ -75,6 +82,12 @@ class mCheckBox(QCheckBox):
         self.setFixedSize(20, 20)
         self.setChecked(True if idx != 0 else False)  # Устанавливаем состояние чекбокса
         self.setStyleSheet("text-align: end;")  # Устанавливаем цвет текста чекбокса
+
+class mMark(QLabel):
+    def __init__(self, color):
+        super().__init__()
+        self.setFixedSize(15, 15)  # Устанавливаем размер кружка
+        self.setStyleSheet(f"background-color: {color}; border-radius: 7.5px;")
 
 class DiskApp(QWidget):
     def __init__(self):
@@ -89,8 +102,10 @@ class DiskApp(QWidget):
         # Создаем QListWidget
         self.disk_list = QListWidget()
         self.disk_labels = {
+            'circle': [mMark('red') for _ in range(10)],
             'model': [mModel(self, idx) for idx in range(10)],
             'serial': [mSerial() for _ in range(10)],
+            'smart': [mSmart() for _ in range(10)],
             'checkbox': [mCheckBox(idx) for idx in range(10)]
         }
 
@@ -98,7 +113,6 @@ class DiskApp(QWidget):
         self.main_layout = QVBoxLayout()
         
 
-        # Добавляем лейбл "Refresh activity" в верхней части окна
         
         
         self._configure_markers_info()
@@ -119,6 +133,7 @@ class DiskApp(QWidget):
         # self.refresh_button = QPushButton("Refresh")
         self.victoria_button = QPushButton("Victoria (8 wins)")
         self.victoria_close_button = QPushButton("Victoria (avaliable disks)")
+        self.pushsmart_button = QPushButton("Get SMART (smartctl)")
 
         # Подключаем события к кнопкам
         self.cleard_button.clicked.connect(self.clear_default)
@@ -127,6 +142,7 @@ class DiskApp(QWidget):
         # self.refresh_button.clicked.connect(self.enable_refresh)
         self.victoria_button.clicked.connect(partial(self.victoria_open, 8))
         self.victoria_close_button.clicked.connect(partial(self.victoria_open, 1))
+        self.pushsmart_button.clicked.connect(self.push_smart)
 
         # Создаем горизонтальный компоновщик для кнопок Clear
         clear_layout = QHBoxLayout()
@@ -144,28 +160,7 @@ class DiskApp(QWidget):
 
         # Остальные кнопки добавляем ниже
         self.main_layout.addWidget(self.eject_button)
-        # self.main_layout.addWidget(self.refresh_button)
-
-        # # Добавляем лейбл "Refresh activity" внизу
-        # self.refresh_label = QLabel("Refresh activity")
-        # self.refresh_label.setAlignment(Qt.AlignCenter)
-        # self.refresh_label.setStyleSheet("font-size: 10px; background-color: #555; color: #FFF;")
-        # self.main_layout.addWidget(self.refresh_label)
-        # self.is_refresh_highlighted = False  # Флаг состояния цвета лейбла
-
-        # self.refresh_label = QLabel("R")
-        # self.refresh_label.setFixedSize(20, 20)  # Размер круга 20x20
-        # self.refresh_label.setStyleSheet("""
-        #     background-color: #2652D6;
-        #     border-radius: 10px;  /* Делает лейбл круглым */
-        #     border: 1px solid #333;
-        # """)
-        # self.is_refresh_highlighted = False
-
-        # top_layout = QHBoxLayout()
-        # top_layout.addWidget(self.refresh_label, alignment=Qt.AlignLeft)  # Лейбл выравнен влево
-        # top_layout.addStretch()  # Добавляем пространство для выравнивания
-        # self.main_layout.addLayout(top_layout)
+        self.main_layout.addWidget(self.pushsmart_button)
 
         # Устанавливаем основной компоновщик
         self.setLayout(self.main_layout)
@@ -188,12 +183,17 @@ class DiskApp(QWidget):
         self.clipboard = QApplication.clipboard()
 
         # Запускаем таймер для обновления информации каждые 2 секунды
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.refresh_disk_info)
-        self.timer.start(500)
+        self.dtimer = QTimer()
+        self.dtimer.timeout.connect(self.refresh_disk_info)
+        self.dtimer.start(500)
+        
+        self.stimer = QTimer()
+        self.stimer.timeout.connect(self.refresh_smart_info)
+        self.stimer.start(500)
 
         # Первая инициализация информации о дисках
         self.thread_data.update()
+        self.configure_disk_labels()
         self.refresh_disk_info()
         # self.enable_refresh()
         
@@ -205,6 +205,8 @@ class DiskApp(QWidget):
         self.scsi_sleep_thread: threading.Thread = None
         self.sleep_thr_timer = QTimer()
         self.sleep_thr_timer.timeout.connect(self.scsi_sleep_activity)
+        
+        # self.set_disks_header()
 
         # self.victoriaa_thread = threading>ThreadData(target=self.victoria_open)
         
@@ -319,12 +321,12 @@ class DiskApp(QWidget):
         h_layout = QHBoxLayout(widget)  # Используем компоновщик внутри этого виджета
 
         # Создаем цветные метки-кружочки и поясняющий текст
-        green_mrk = self._colored_marker('green')
-        yellow_mrk = self._colored_marker('yellow')
-        red_mrk = self._colored_marker('red')
-        grey_mrk = self._colored_marker('grey')
-        orange_mrk = self._colored_marker('orange')
-        violet_mark = self._colored_marker('#9500F4')
+        green_mrk = mMark('green')
+        yellow_mrk = mMark('yellow')
+        red_mrk = mMark('red')
+        grey_mrk = mMark('grey')
+        orange_mrk = mMark('orange')
+        violet_mark = mMark('#9500F4')
 
         
         
@@ -407,28 +409,84 @@ class DiskApp(QWidget):
             disk_model = ' '.join(lb.text().split()[1:]).strip()
             self.clipboard.setText(disk_model)
 
+    def configure_disk_labels(self):
+        
+        for i in range(10):
+                
+            # Метка для кружка
+            item = QListWidgetItem()  # Создаем элемент списка
+            widget = QWidget()  # Создаем виджет для элемента
+            h_layout = QHBoxLayout()  # Горизонтальный компоновщик
 
-    def refresh_disk_info(self):
-            # if self.is_refresh_highlighted:
-            #     self.refresh_label.setStyleSheet("font-size: 14px; font-weight: bold; background-color: #2652D6; color: #2652D6;")
-            # else:
-            #     self.refresh_label.setStyleSheet("font-size: 14px; font-weight: bold; background-color: #5C65D6; color: #5C65D6;")
-            # self.is_refresh_highlighted = not self.is_refresh_highlighted
+            # circle = self._colored_marker(color='red')
+    
+            # Создаем метку для модели
+            self.disk_labels['model'][i].setText(f"[{i}]  " + 'None')
 
+            self.disk_labels['model'][i].setStyleSheet("color: %s;" % 'red')  # Установка цвета для модели
+
+            self.disk_labels['smart'][i].setText("0p0u0")
+            # Создаем метку для серийного номера
+            self.disk_labels['serial'][i].setText("S/N: ")
+
+            # Добавляем виджеты в горизонтальный компоновщик
+            h_layout.addWidget(self.disk_labels['circle'][i])
+            h_layout.addWidget(self.disk_labels['model'][i])
+            h_layout.addWidget(self.disk_labels['serial'][i])
+            h_layout.addWidget(self.disk_labels['smart'][i])
+            h_layout.addWidget(self.disk_labels['checkbox'][i])
+            
+            h_layout.setContentsMargins(0, 0, 0, 0)  # Убираем отступы
+
+            widget.setLayout(h_layout)  # Устанавливаем компоновщик для виджета
+            item.setSizeHint(widget.sizeHint())  # Устанавливаем размер элемента
+            self.disk_list.addItem(item)  # Добавляем элемент в QListWidget
+            self.disk_list.setItemWidget(item, widget)  # Устанавливаем виджет для элемента
+
+    def push_smart(self):
+        smarts = smart_check.get_short_smarts()
+        short_sm, complex_sm = smarts
+        self.thread_data.smart_queue.put(short_sm)
+    
+    def refresh_smart_info(self):
+        
+        try:
+            smart_info = self.thread_data.smart_queue.get_nowait()
+        except queue.Empty:
+            return
+        
+        for i, inf in enumerate(smart_info):
+            
+            if len(inf) >= 1:
+                self.disk_labels['smart'][i].setText(inf)
+                
+                
+                bads = int(inf.split('p')[0])
+
+                if bads > 0:
+                    self.disk_labels['smart'][i].setStyleSheet("color: #F7A116;")
+                    if bads > 20:
+                        self.disk_labels['smart'][i].setStyleSheet("color: #F74D16;")
+                    
+                else:
+                    self.disk_labels['smart'][i].setStyleSheet("color: #16F76E;")
+
+            
+    
+    def refresh_disk_info(self):        
         if self.thread_data.is_refresh_require:
             try:
-                disk_info = self.thread_data.queue.get_nowait()
+                disk_info = self.thread_data.disks_queue.get_nowait()
+                # self.disk_list.clear()
             except queue.Empty:
                 return
-            
-            self.disk_list.clear()
 
             for i, model, serial, p_info, is_sleep in disk_info:
                 
-                # Метка для кружка
-                item = QListWidgetItem()  # Создаем элемент списка
-                widget = QWidget()  # Создаем виджет для элемента
-                h_layout = QHBoxLayout()  # Горизонтальный компоновщик
+                # # Метка для кружка
+                # item = QListWidgetItem()  # Создаем элемент списка
+                # widget = QWidget()  # Создаем виджет для элемента
+                # h_layout = QHBoxLayout()  # Горизонтальный компоновщик
 
 
                 # Создаем метку для индекса
@@ -457,29 +515,34 @@ class DiskApp(QWidget):
 
                 if serial.startswith('0000'):
                     serial = "..."
+                # print(model)
+                self.disk_labels['circle'][i].setStyleSheet(f"background-color: {cclr}; border-radius: 7.5px;")
 
-                circle = self._colored_marker(color=cclr)
-        
                 # Создаем метку для модели
                 self.disk_labels['model'][i].setText(f"[{i}]  " + model)
+                print(self.disk_labels['model'][i].text())
+                
 
                 clr_m = "red" if model == 'Not connected' else '#27C4E2'
                 self.disk_labels['model'][i].setStyleSheet("color: %s;" % clr_m)  # Установка цвета для модели
 
+                # self.disk_labels['smart'][i].setText("0p0u0")
                 # Создаем метку для серийного номера
                 self.disk_labels['serial'][i].setText("S/N: " + serial.strip())
 
-                # Добавляем виджеты в горизонтальный компоновщик
-                h_layout.addWidget(circle)
-                h_layout.addWidget(self.disk_labels['model'][i])
-                h_layout.addWidget(self.disk_labels['serial'][i])
-                h_layout.addWidget(self.disk_labels['checkbox'][i])
-                h_layout.setContentsMargins(0, 0, 0, 0)  # Убираем отступы
+                # # Добавляем виджеты в горизонтальный компоновщик
+                # h_layout.addWidget(circle)
+                # h_layout.addWidget(self.disk_labels['model'][i])
+                # h_layout.addWidget(self.disk_labels['serial'][i])
+                # h_layout.addWidget(self.disk_labels['smart'][i])
+                # h_layout.addWidget(self.disk_labels['checkbox'][i])
+                
+                # h_layout.setContentsMargins(0, 0, 0, 0)  # Убираем отступы
 
-                widget.setLayout(h_layout)  # Устанавливаем компоновщик для виджета
-                item.setSizeHint(widget.sizeHint())  # Устанавливаем размер элемента
-                self.disk_list.addItem(item)  # Добавляем элемент в QListWidget
-                self.disk_list.setItemWidget(item, widget)  # Устанавливаем виджет для элемента
+                # widget.setLayout(h_layout)  # Устанавливаем компоновщик для виджета
+                # item.setSizeHint(widget.sizeHint())  # Устанавливаем размер элемента
+                # self.disk_list.addItem(item)  # Добавляем элемент в QListWidget
+                # self.disk_list.setItemWidget(item, widget)  # Устанавливаем виджет для элемента
  
     def gather_indices(self) -> list:
         selected_indices = []  # Список для хранения индексов выделенных элементов
