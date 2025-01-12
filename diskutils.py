@@ -286,7 +286,8 @@ def get_partition_count(disk_number):
         return 'NL'
 
 def delete_disk_partitions(disk_index, rescan):
-
+    print("Safe mode enabled")
+    return 
     rescan_command = ''
 
     if rescan:
