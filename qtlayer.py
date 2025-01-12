@@ -94,7 +94,7 @@ class DiskApp(QWidget):
         super().__init__()
         # Создаем основной компоновщик
         self.setWindowTitle("HDD-Handler")
-        self.setMinimumSize(600, 360)
+        self.setMinimumSize(770, 390)
         # self.layout = QVBoxLayout()
         self.icon = QIcon('hddc.ico')
         self.setWindowIcon(self.icon)
