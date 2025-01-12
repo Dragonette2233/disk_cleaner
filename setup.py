@@ -22,8 +22,8 @@ except ImportError:
     get_qt_plugins_paths = None
 
 include_files = [
-    os.path.join("C:\py-wf\disk_cleaner\.env\Lib\site-packages\pywin32_system32", "pywintypes312.dll"),
-    'victoriapath'
+    os.path.join(".", ".env", "Lib", "site-packages", "pywin32_system32", "pywintypes312.dll"),
+    'victoriapath', 'hddc.ico', ("smartmontools", "smartmontools")
 ]
 if get_qt_plugins_paths:
     # Inclusion of extra plugins (since cx_Freeze 6.8b2)
@@ -39,19 +39,19 @@ build_exe_options = {
     "include_msvcr": True,
 }
 
-bdist_mac_options = {
-    "bundle_name": "Test",
-}
+# bdist_mac_options = {
+#     "bundle_name": "Test",
+# }
 
-bdist_dmg_options = {
-    "volume_label": "TEST",
-}
+# bdist_dmg_options = {
+#     "volume_label": "TEST",
+# }
 
 executables = [Executable("main.py", base="gui", icon="hddc.ico", target_name='hddc')]
 
 setup(
     name="HDD-Handler",
-    version="1.35",
+    version="1.4",
     description="HDD-Handler",
     options={
         "build_exe": build_exe_options,
