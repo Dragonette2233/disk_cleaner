@@ -137,4 +137,4 @@ def victoria_run(connected):
         else:
             print(f"Окно не найдено для процесса PID {proc.pid}")
     
-    print('lll')
+    # print('lll')
