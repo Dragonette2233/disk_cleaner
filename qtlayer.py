@@ -555,8 +555,8 @@ class DiskApp(QWidget):
                         cclr = 'orange'
                     case 'UL' | 'NL' | 'NC', 'Not connected' | "! Disconnected !", False:
                         cclr = 'red'
-                        self.disk_labels['model'][i].setStyleSheet("color: #3BF4FA;")
-                        self.disk_labels['model'][i].setText("[smart data]")
+                        self.disk_labels['smart'][i].setStyleSheet("color: #3BF4FA;")
+                        self.disk_labels['smart'][i].setText("[smart data]")
                     case 'EL', model, False:
                         cclr = 'yellow'
                     case 'NL', model, False:
