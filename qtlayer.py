@@ -97,6 +97,9 @@ class mSmart(QLabel):
         self.tooltip = PersistentToolTip(self)
         self.setMouseTracking(True)
 
+    def set_color(self, color='#3BF4FA'):
+        self.setStyleSheet(f"color: {color};")
+
     def enterEvent(self, event):
         if self.smart_complex:
             self.tooltip.show_at(self.smart_complex, event.globalPos() + QPoint(10, 10))
@@ -109,10 +112,10 @@ class mSmart(QLabel):
     def d_update(self, text):
         self.smart_complex = text
 
-    def d_reset(self):
+    def d_reset(self, msg='smart data'):
         self.smart_complex = ""
         self.setStyleSheet("color: #3BF4FA;")
-        self.setText("[smart data]")
+        self.setText(f"[{msg}]")
 
         
 class mSerial(QLabel):
@@ -149,7 +152,8 @@ class DiskApp(QWidget):
             'circle': [mMark('red') for _ in range(10)],
             'model': [mModel(self, idx) for idx in range(10)],
             'serial': [mSerial() for _ in range(10)],
-            'smart': [mSmart() for _ in range(10)],
+            'smart_data': [mSmart() for _ in range(10)],
+            'smart_cache': [mSmart() for _ in range(10)],
             'checkbox': [mCheckBox(idx) for idx in range(10)]
         }
 
@@ -178,6 +182,7 @@ class DiskApp(QWidget):
         self.victoria_button = QPushButton("Victoria (8 wins)")
         self.victoria_close_button = QPushButton("Victoria (avaliable disks)")
         self.pushsmart_button = QPushButton("Get SMART (smartctl)")
+        self.clearsmart_button = QPushButton("Clear SMART cache")
 
         # Подключаем события к кнопкам
         self.cleard_button.clicked.connect(self.clear_default)
@@ -187,6 +192,7 @@ class DiskApp(QWidget):
         self.victoria_button.clicked.connect(partial(self.victoria_open, 8))
         self.victoria_close_button.clicked.connect(partial(self.victoria_open, 1))
         self.pushsmart_button.clicked.connect(self.push_smart)
+        self.clearsmart_button.clicked.connect(self.clear_smart_cache)
 
         # Создаем горизонтальный компоновщик для кнопок Clear
         clear_layout = QHBoxLayout()
@@ -198,13 +204,18 @@ class DiskApp(QWidget):
         victoria_layout.addWidget(self.victoria_button)
         victoria_layout.addWidget(self.victoria_close_button)
 
+        smart_layout = QHBoxLayout()
+        smart_layout.addWidget(self.pushsmart_button)
+        smart_layout.addWidget(self.clearsmart_button)
         # Добавляем компоновки кнопок в основной вертикальный компоновщик
         self.main_layout.addLayout(clear_layout)
         self.main_layout.addLayout(victoria_layout)
+        self.main_layout.addLayout(smart_layout)
 
+        
         # Остальные кнопки добавляем ниже
         self.main_layout.addWidget(self.eject_button)
-        self.main_layout.addWidget(self.pushsmart_button)
+        
 
         # Устанавливаем основной компоновщик
         self.setLayout(self.main_layout)
@@ -347,8 +358,8 @@ class DiskApp(QWidget):
             self.clr_thr_timer.stop()
             self.cleard_button.setDisabled(False)
             self.clearr_button.setDisabled(False)
-            self.cleard_button.setText("Clear DEFAULT")
-            self.clearr_button.setText("Clear RESCAN")
+            self.cleard_button.setText("DP Clear DEFAULT")
+            self.clearr_button.setText("DP Clear RESCAN")
             self.cleard_button.setStyleSheet("color: white;")
             self.clearr_button.setStyleSheet("color: white;")
 
@@ -438,6 +449,7 @@ class DiskApp(QWidget):
         action_clear_r = context_menu.addAction("Clear (Rescan)")
         action_sleep = context_menu.addAction("Send sleep")
         action_copy = context_menu.addAction("Copy")
+        action_smart = context_menu.addAction("SMART")
 
         # Отображаем меню в позиции курсора
         action = context_menu.exec_(lb.mapToGlobal(position))
@@ -450,6 +462,9 @@ class DiskApp(QWidget):
         elif action == action_sleep:
             threading.Thread(target=scsi_sleep_command, args=((idx, ), ), daemon=True).start()
         elif action == action_copy:
+            disk_model = ' '.join(lb.text().split()[1:]).strip()
+            self.clipboard.setText(disk_model)
+        elif action == action_smart:
             disk_model = ' '.join(lb.text().split()[1:]).strip()
             self.clipboard.setText(disk_model)
 
@@ -469,15 +484,17 @@ class DiskApp(QWidget):
 
             self.disk_labels['model'][i].setStyleSheet("color: %s;" % 'red')  # Установка цвета для модели
 
-            self.disk_labels['smart'][i].setText("[smart data]")
+            self.disk_labels['smart_data'][i].setText("[smart data]")
+            self.disk_labels['smart_cache'][i].setText("[smart cache]")
             # Создаем метку для серийного номера
-            self.disk_labels['serial'][i].setText("S/N: ")
+            self.disk_labels['serial'][i].setText(f"S/N: {223}")
 
             # Добавляем виджеты в горизонтальный компоновщик
             h_layout.addWidget(self.disk_labels['circle'][i])
             h_layout.addWidget(self.disk_labels['model'][i])
             h_layout.addWidget(self.disk_labels['serial'][i])
-            h_layout.addWidget(self.disk_labels['smart'][i])
+            h_layout.addWidget(self.disk_labels['smart_data'][i])
+            h_layout.addWidget(self.disk_labels['smart_cache'][i])
             h_layout.addWidget(self.disk_labels['checkbox'][i])
             
             h_layout.setContentsMargins(0, 0, 0, 0)  # Убираем отступы
@@ -487,10 +504,35 @@ class DiskApp(QWidget):
             self.disk_list.addItem(item)  # Добавляем элемент в QListWidget
             self.disk_list.setItemWidget(item, widget)  # Устанавливаем виджет для элемента
 
-    def push_smart(self):
-        smarts: list[list] = smart_check.get_short_smarts()
+    def reset_smart_button(self):
+        self.pushsmart_button.setText('Get SMART (smartctl)')
+        self.pushsmart_button.setStyleSheet("color: white;")
+    
+    def clear_smart_cache(self):
+
+        for i in self.disk_labels['smart_cache']:
+            i.d_reset('smart cache')
+
+
+    def push_smart(self, disk_num=False):
+
+        self.pushsmart_button.setText("calling SMART...")
+        self.pushsmart_button.setStyleSheet("color: #DC93CD")
+
+        if disk_num:
+           smarts: list[list] = smart_check.get_short_smarts(disk_num)  
+        else:
+           smarts: list[list] = smart_check.get_short_smarts() 
         # print(smarts)
         self.thread_data.smart_queue.put(smarts)
+
+        self.pushsmart_button.setText("SMART updated.")
+        self.pushsmart_button.setStyleSheet("color: #16F76E;")
+
+        self.smtimer = QTimer()
+        self.smtimer.setSingleShot(True)
+        self.smtimer.timeout.connect(self.reset_smart_button)
+        self.smtimer.start(1000)
     
     def refresh_smart_info(self):
         
@@ -501,9 +543,22 @@ class DiskApp(QWidget):
         
         for i, inf in enumerate(short_sm):
             
+            if inf == '!timeout':
+                self.disk_labels['smart_data'][i].setStyleSheet("color: #E087CA;")
+                self.disk_labels['smart_data'][i].setText(inf)
+                continue
+
             if len(inf) >= 1:
-                self.disk_labels['smart'][i].setText(inf)
-                self.disk_labels['smart'][i].d_update(complex_sm[i])
+
+                curr_smart = self.disk_labels['smart_data'][i].text()
+
+                if curr_smart != inf and curr_smart != '[smart data]':
+                    self.disk_labels['smart_cache'][i].setText(curr_smart)
+                    self.disk_labels['smart_cache'][i].set_color('#DDE3E3')
+                    
+
+                self.disk_labels['smart_data'][i].setText(inf)
+                self.disk_labels['smart_data'][i].d_update(complex_sm[i])
                 
                 
                 
@@ -514,17 +569,17 @@ class DiskApp(QWidget):
                     pendings = int(inf.replace('p', '_').replace('u', '_').split('_')[1])
                     
                     if usc > 0 or pendings > 0:
-                        self.disk_labels['smart'][i].setStyleSheet("color: #8BF011;")
+                        self.disk_labels['smart_data'][i].setStyleSheet("color: #8BF011;")
                                                 
                 
                 if bads > 0:
-                    self.disk_labels['smart'][i].setStyleSheet("color: #F7A116;")
+                    self.disk_labels['smart_data'][i].setStyleSheet("color: #F7A116;")
                     
                 if bads > 20:
-                    self.disk_labels['smart'][i].setStyleSheet("color: #F74D16;")
+                    self.disk_labels['smart_data'][i].setStyleSheet("color: #F74D16;")
                         
                 if inf == '0p0u0' or inf == '0':
-                    self.disk_labels['smart'][i].setStyleSheet("color: #16F76E;")
+                    self.disk_labels['smart_data'][i].setStyleSheet("color: #16F76E;")
 
             
     
@@ -555,8 +610,11 @@ class DiskApp(QWidget):
                         cclr = 'orange'
                     case 'UL' | 'NL' | 'NC', 'Not connected' | "! Disconnected !", False:
                         cclr = 'red'
-                        self.disk_labels['smart'][i].setStyleSheet("color: #3BF4FA;")
-                        self.disk_labels['smart'][i].setText("[smart data]")
+                        self.disk_labels['smart_data'][i].setStyleSheet("color: #3BF4FA;")
+                        self.disk_labels['smart_data'][i].setText("[smart data]")
+
+                        self.disk_labels['smart_cache'][i].setStyleSheet("color: #3BF4FA;")
+                        self.disk_labels['smart_cache'][i].setText("[smart cache]")
                     case 'EL', model, False:
                         cclr = 'yellow'
                     case 'NL', model, False:
@@ -585,7 +643,7 @@ class DiskApp(QWidget):
 
                 # self.disk_labels['smart'][i].setText("0p0u0")
                 # Создаем метку для серийного номера
-                self.disk_labels['serial'][i].setText("S/N: " + serial.strip())
+                self.disk_labels['serial'][i].setText(serial.strip())
 
                 # # Добавляем виджеты в горизонтальный компоновщик
                 # h_layout.addWidget(circle)
