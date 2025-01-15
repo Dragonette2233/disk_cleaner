@@ -38,24 +38,31 @@ def get_short_smarts(disk_num=False, timeout=4):
 
         for line in strings:
             line_as_list = line.split()
+            
+            # print(line_as_list)
             if line_as_list:
-                if line_as_list[0] in ('1', '4', '5', '9', '197', '198', '199'):
+                
+                if line_as_list[0] in ('1', '4', '5', '9', '197', '198'):
+                    # print(len(line_as_list))
+                        
                     match line_as_list[0]:
                         case '5':
-                            smart_short_view.append(line_as_list[-1])
-                            smart_complex_view.append(f"Relocated -- {line_as_list[-1]}")
+                            smart_short_view.append(line_as_list[9])
+                            smart_complex_view.append(f"Relocated -- {line_as_list[9]}")
                         case '197':
-                            smart_short_view.append('p' + line_as_list[-1])
-                            smart_complex_view.append(f"Current pending -- {line_as_list[-1]}")
+                            smart_short_view.append('p' + line_as_list[9])
+                            smart_complex_view.append(f"Current pending -- {line_as_list[9]}")
                         case '198':
-                            smart_short_view.append('u' + line_as_list[-1])
-                            smart_complex_view.append(f"Offline uncorrectable -- {line_as_list[-1]}")
+                            smart_short_view.append('u' + line_as_list[9])
+                            smart_complex_view.append(f"Offline uncorrectable -- {line_as_list[9]}")
                         case '199':
-                            smart_complex_view.append(f"Ultra DMA CRC -- {line_as_list[-1]}")
+                            smart_complex_view.append(f"Ultra DMA CRC -- {line_as_list[9]}")
                         case '9':
-                            smart_complex_view.insert(0, f"Power on hours -- {line_as_list[-1]}")
+                            smart_complex_view.insert(0, f"Power on hours -- {line_as_list[9]}")
+        
         
         short_string = ''.join(i for i in smart_short_view)
+        print(short_string)
         complex_string = '\n'.join(i for i in smart_complex_view)
         
         smarts_short.append(short_string)

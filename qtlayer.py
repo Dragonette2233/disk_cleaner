@@ -561,10 +561,11 @@ class DiskApp(QWidget):
                 self.disk_labels['smart_data'][i].d_update(complex_sm[i])
                 
                 
-                
+                print(inf)
+
                 bads = int(inf.split('p')[0])
                 # bads = 1
-                if len(inf) >= 2:
+                if 'u' in inf:
                     usc = int(inf.split('u')[1])
                     pendings = int(inf.replace('p', '_').replace('u', '_').split('_')[1])
                     
