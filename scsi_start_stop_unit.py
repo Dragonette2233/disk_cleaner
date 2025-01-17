@@ -113,6 +113,7 @@ def send_scsi_command(drive_number, command, check=False):
         scsi_command = SCSI_PASS_THROUGH_DIRECT()
         scsi_command.Length = ctypes.sizeof(SCSI_PASS_THROUGH_DIRECT)
         scsi_command.CdbLength = 6  # Длина команды
+       #  scsi_command.DataIn = 1  # Данные передаются
         if not check:
             scsi_command.DataIn = 0  # Данные не передаются
             scsi_command.DataTransferLength = 0
@@ -123,7 +124,7 @@ def send_scsi_command(drive_number, command, check=False):
             scsi_command.DataBuffer = ctypes.cast(data_buffer, ctypes.POINTER(ctypes.c_ubyte))
             
 
-        scsi_command.TimeOutValue = 10  # Таймаут в секундах
+        scsi_command.TimeOutValue = 5  # Таймаут в секундах
         # scsi_command.DataBuffer = ctypes.cast(data_buffer, ctypes.POINTER(ctypes.c_ubyte))
         scsi_command.SenseInfoOffset = ctypes.addressof(sense_buffer)
         scsi_command.Cdb = cdb_command
@@ -152,6 +153,8 @@ def send_scsi_command(drive_number, command, check=False):
 
         if check:
             # Анализ данных sense buffer
+            # print(drive_number)
+            # print(data_buffer[0:])
             additional_sense_code = data_buffer[16] == 0
             if additional_sense_code:
                 # in sleep

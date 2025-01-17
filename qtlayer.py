@@ -601,7 +601,7 @@ class DiskApp(QWidget):
 
 
                 # Создаем метку для индекса
-
+                # print(p_info, model, is_sleep)
                 match p_info, model, is_sleep:
                     case p_info, model, 'IO':
                         model = model + ' (I/O)'
@@ -611,11 +611,8 @@ class DiskApp(QWidget):
                         cclr = 'orange'
                     case 'UL' | 'NL' | 'NC', 'Not connected' | "! Disconnected !", False:
                         cclr = 'red'
-                        self.disk_labels['smart_data'][i].setStyleSheet("color: #3BF4FA;")
-                        self.disk_labels['smart_data'][i].setText("[smart data]")
-
-                        self.disk_labels['smart_cache'][i].setStyleSheet("color: #3BF4FA;")
-                        self.disk_labels['smart_cache'][i].setText("[smart cache]")
+                        self.disk_labels['smart_data'][i].d_reset(msg='smart data')
+                        self.disk_labels['smart_cache'][i].d_reset(msg='smart cache')
                     case 'EL', model, False:
                         cclr = 'yellow'
                     case 'NL', model, False:

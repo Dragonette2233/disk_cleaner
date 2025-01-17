@@ -42,7 +42,7 @@ def get_short_smarts(disk_num=False, timeout=4):
             # print(line_as_list)
             if line_as_list:
                 
-                if line_as_list[0] in ('1', '4', '5', '9', '197', '198'):
+                if line_as_list[0] in ('1', '4', '5', '9', '197', '198', '199'):
                     # print(len(line_as_list))
                         
                     match line_as_list[0]:
@@ -62,7 +62,7 @@ def get_short_smarts(disk_num=False, timeout=4):
         
         
         short_string = ''.join(i for i in smart_short_view)
-        print(short_string)
+        # print(short_string)
         complex_string = '\n'.join(i for i in smart_complex_view)
         
         smarts_short.append(short_string)
