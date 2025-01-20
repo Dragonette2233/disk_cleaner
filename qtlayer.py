@@ -554,6 +554,7 @@ class DiskApp(QWidget):
 
                 if curr_smart != inf and curr_smart != '[smart data]':
                     self.disk_labels['smart_cache'][i].setText(curr_smart)
+                    self.disk_labels['smart_cache'][i].smart_complex += curr_smart + '\n'
                     self.disk_labels['smart_cache'][i].set_color('#DDE3E3')
                     
 
