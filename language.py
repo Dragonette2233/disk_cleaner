@@ -1,0 +1,55 @@
+class ENG:
+    APP_TITLE = "HDD-Handler"
+    Disconnected = "! Disconnected !"
+    Not_connected = "Not connected"
+    DP_Clear_DEFAULT = "DP Clear DEFAULT"
+    DP_Clear_RESCAN = "DP Clear RESCAN"
+    Sleep_SCSI = "Sleep (SCSI)"
+    Victoria_8_wins = "Victoria (8 wins)"
+    Victoria_avaliable_disks = "Victoria (avaliable disks)"
+    Get_SMART_smartctl = "Get SMART (smartctl)"
+    Clear_SMART_cache = "Clear SMART cache"
+    
+    wo_parts = "w/o parts"
+    w_parts = "with parts"
+    not_connected = "not connected"
+    busy = "busy"
+    err = "err"
+    sleep = "sleep"
+
+    smart_data = "[smart data]"
+    smart_cache = "[smart cache]"
+    calling_SMART = "calling SMART..."
+    SMART_updated = "SMART updated."
+
+    CONFLIT = 'CONFLICT'
+    SENDING_SLEEP_TO_DEVICES = "SENDING SLEEP TO DEVICES..."
+    CLEARING_PARTITIONS = "CLEARING PARTITIONS..."
+
+class RUS:
+    APP_TITLE = "HDD-Handler"
+    Disconnected = "! Отключен !"
+    Not_connected = "Не подключено"
+    DP_Clear_DEFAULT = "Очистка DP ПО УМОЛЧАНИЮ"
+    DP_Clear_RESCAN = "Очистка DP ПЕРЕСКАН"
+    Sleep_SCSI = "Сон (SCSI)"
+    Victoria_8_wins = "Victoria (8 окон)"
+    Victoria_avaliable_disks = "Victoria (подключенные диски)"
+    Get_SMART_smartctl = "Получить SMART (smartctl)"
+    Clear_SMART_cache = "Очистить кэш SMART"
+    
+    wo_parts = "без разделов"
+    w_parts = "с разделами"
+    not_connected = "не подключен"
+    busy = "занят"
+    err = "ошибка"
+    sleep = "сон"
+
+    smart_data = "[smart данные]"
+    smart_cache = "[smart кэш]"
+    calling_SMART = "Вызов SMART..."
+    SMART_updated = "SMART обновлен."
+
+    CONFLIT = "КОНФЛИКТ"
+    SENDING_SLEEP_TO_DEVICES = "ОТПРАВКА УСТРОЙСТВ В СПЯЩИЙ РЕЖИМ..."
+    CLEARING_PARTITIONS = "ОЧИСТКА РАЗДЕЛОВ..."

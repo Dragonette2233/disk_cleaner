@@ -4,8 +4,7 @@ from PyQt5.QtWidgets import (
     QListWidgetItem, QLabel, 
     QHBoxLayout, QPushButton, 
     QCheckBox, QMenu,
-    QFileDialog, QMessageBox,
-    QToolTip)
+    QFileDialog, QMessageBox)
 from functools import partial
 from victoria_open_ctypes import VICTORIA_PATH, CONFIG_PATH
 import victoria_open_ctypes
@@ -157,17 +156,11 @@ class DiskApp(QWidget):
             'checkbox': [mCheckBox(idx) for idx in range(10)]
         }
 
-         # Основной вертикальный компоновщик
+        # Основной вертикальный компоновщик
         self.main_layout = QVBoxLayout()
-        
-
-        
-        
+    
         self._configure_markers_info()
-        # Горизонтальный компоновщик для верхней части
-        
 
-        # Добавляем верхний лейаут в основной
         
 
         # Создаем QListWidget
@@ -250,7 +243,7 @@ class DiskApp(QWidget):
         self.thread_data.update()
         self.configure_disk_labels()
         self.refresh_disk_info()
-        # self.enable_refresh()
+
         
         self.update_thread = threading.Thread(target=self.run_update_thread, daemon=True).start()
         self.clearing_thread: threading.Thread = None
@@ -260,10 +253,7 @@ class DiskApp(QWidget):
         self.scsi_sleep_thread: threading.Thread = None
         self.sleep_thr_timer = QTimer()
         self.sleep_thr_timer.timeout.connect(self.scsi_sleep_activity)
-        
-        # self.set_disks_header()
 
-        # self.victoriaa_thread = threading>ThreadData(target=self.victoria_open)
         
     def victoria_open(self, connected=8):
         global VICTORIA_PATH, CONFIG_PATH
@@ -273,15 +263,14 @@ class DiskApp(QWidget):
         elif connected == 1:
             l = []
             for i, m in enumerate(self.disk_labels['model']):
-                # print(i)
                 if i != 0:
                     model: str = m.text().split()[1].strip()
                     if not model.startswith(("Not", "! ")):
+                        print(i, 'is disk')
                         l.append(i)
                 
             l = tuple(l)
         
-        # print(l)
 
         if not os.path.exists(VICTORIA_PATH):
             # print(VICTORIA_PATH)
@@ -316,41 +305,7 @@ class DiskApp(QWidget):
                     QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить путь: {str(e)}")
 
         else:
-            print('victoria found. Running')
             threading.Thread(target=victoria_open_ctypes.victoria_run, args=(l, ), daemon=True).start()
-        # return
-
-
-
-        # options = QFileDialog.Options()
-        # options |= QFileDialog.ReadOnly
-        # file_path, _ = QFileDialog.getOpenFileName(
-        #     self,
-        #     "Выберите файл Victoria",
-        #     "",
-        #     "Исполняемые файлы (*.exe);;Все файлы (*)",
-        #     options=options
-        # )
-
-        # if file_path:
-        #     try:
-        #         # Проверка, что выбран файл с расширением .exe
-        #         if not file_path.endswith(".exe"):
-        #             raise ValueError("Выберите исполняемый файл (.exe).")
-
-        #         # Сохранение пути в файл
-        #         config_path = "victoriapath"  # Укажите путь к файлу для сохранения пути
-        #         with open(config_path, "w") as file:
-        #             file.write(file_path)
-
-        #         QMessageBox.information(self, "Успех", f"Путь к Victoria сохранён:\n{file_path}")
-        #     except Exception as e:
-        #         QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить путь: {str(e)}")
-
-        # threading.Thread(target=victoria_open_ctypes.victoria_run, args=(l, ), daemon=True).start()
-    
-    def victoria_close(self):
-        ...
 
     def clearing_activity(self):
         
@@ -424,15 +379,6 @@ class DiskApp(QWidget):
         mrk.setStyleSheet(f"background-color: {color}; border-radius: 7.5px;")
         return mrk
 
-    
-    # def enable_refresh(self):
-    #     if not self.timer.isActive():
-    #         self.timer.start(500)
-    #         # self.refresh_button.setStyleSheet("color: #41C871;")
-    #     else:
-    #         # self.refresh_button.setStyleSheet("color: #FFFFFF;")
-    #         self.timer.stop()
-    
     def run_update_thread(self):
 
         while True:
@@ -589,20 +535,10 @@ class DiskApp(QWidget):
         if self.thread_data.is_refresh_require:
             try:
                 disk_info = self.thread_data.disks_queue.get_nowait()
-                # self.disk_list.clear()
             except queue.Empty:
                 return
 
             for i, model, serial, p_info, is_sleep in disk_info:
-                
-                # # Метка для кружка
-                # item = QListWidgetItem()  # Создаем элемент списка
-                # widget = QWidget()  # Создаем виджет для элемента
-                # h_layout = QHBoxLayout()  # Горизонтальный компоновщик
-
-
-                # Создаем метку для индекса
-                # print(p_info, model, is_sleep)
                 match p_info, model, is_sleep:
                     case p_info, model, 'IO':
                         model = model + ' (I/O)'
@@ -629,34 +565,19 @@ class DiskApp(QWidget):
 
                 if serial.startswith('0000'):
                     serial = "..."
-                # print(model)
+
                 self.disk_labels['circle'][i].setStyleSheet(f"background-color: {cclr}; border-radius: 7.5px;")
 
                 # Создаем метку для модели
                 self.disk_labels['model'][i].setText(f"[{i}]  " + model)
-                # print(self.disk_labels['model'][i].text())
-                
 
                 clr_m = "red" if model == 'Not connected' else '#27C4E2'
                 self.disk_labels['model'][i].setStyleSheet("color: %s;" % clr_m)  # Установка цвета для модели
 
-                # self.disk_labels['smart'][i].setText("0p0u0")
                 # Создаем метку для серийного номера
                 self.disk_labels['serial'][i].setText(serial.strip())
 
-                # # Добавляем виджеты в горизонтальный компоновщик
-                # h_layout.addWidget(circle)
-                # h_layout.addWidget(self.disk_labels['model'][i])
-                # h_layout.addWidget(self.disk_labels['serial'][i])
-                # h_layout.addWidget(self.disk_labels['smart'][i])
-                # h_layout.addWidget(self.disk_labels['checkbox'][i])
-                
-                # h_layout.setContentsMargins(0, 0, 0, 0)  # Убираем отступы
-
-                # widget.setLayout(h_layout)  # Устанавливаем компоновщик для виджета
-                # item.setSizeHint(widget.sizeHint())  # Устанавливаем размер элемента
-                # self.disk_list.addItem(item)  # Добавляем элемент в QListWidget
-                # self.disk_list.setItemWidget(item, widget)  # Устанавливаем виджет для элемента
+          
  
     def gather_indices(self) -> list:
         selected_indices = []  # Список для хранения индексов выделенных элементов
@@ -694,7 +615,7 @@ class DiskApp(QWidget):
             self.cleard_button.setDisabled(True)
             self.clearr_button.setText("CLEARING PARTITIONS...")
             self.clearr_button.setStyleSheet("color: #DC93CD")
-            # print("Selected partitions to clear:", selected_indices)
+
 
     def clear_default(self, single_idx=False):
         selected_indices = self.gather_indices()
@@ -711,7 +632,7 @@ class DiskApp(QWidget):
             self.clearr_button.setDisabled(True)
             self.cleard_button.setText("CLEARING PARTITIONS...")
             self.cleard_button.setStyleSheet("color: #DC93CD")
-            # print("Selected partitions to clear:", selected_indices)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
