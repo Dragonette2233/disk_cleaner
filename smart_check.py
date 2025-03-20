@@ -1,18 +1,78 @@
 import os
 import subprocess
+import json
 
 SMART_CTL_EX = os.path.join('.', 'smartmontools', 'bin', 'smartctl.exe')
 
-def _build_smart():
-    # return short str: 0p0u0 | long str: Power time, Relocated, Pendigs, Uncorrectable
-    ...
+def get_sas_smart(disk_num=False, timeout=4):
+    
+    try:
+        # Используем subprocess.run для добавления таймаута
+        process = subprocess.run(
+            f'"{SMART_CTL_EX}" -j -l error /dev/pd{disk_num}',  # Enclose the path in quotes to handle spaces
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            shell=True,
+            timeout=timeout  # Устанавливаем таймаут в секундах
+        )
+        stdout = process.stdout
+    except subprocess.TimeoutExpired:
+        ...
+    
+    result = json.loads(stdout)
+
+    status = result['smartctl']['exit_status']
+
+
+    if status != 0:
+    
+        return (1, 1)
+
+
+    try:
+        errors = result['scsi_error_counter_log']
+    except KeyError:
+        return (1, 1)
+
+    read_e = errors['read']
+    write_e = errors['write']
+
+    r_corr = read_e['total_errors_corrected']
+    r_uncorr = read_e['total_uncorrected_errors']
+    w_corr = write_e['total_errors_corrected']
+    w_uncorr = write_e['total_uncorrected_errors']
+
+    log_short = f"wc{w_corr}rc{r_corr}wu{w_uncorr}ru{r_uncorr}"
+    log_complex = [
+        "Read/Write Errors",
+        "-----------------",
+        f"Write Corrected - {w_corr}",
+        f"Read Corrected - {r_corr}",
+        f"Write Uncorrected - {w_uncorr}",
+        f"Read Uncorrected - {r_uncorr}"
+    ]
+
+    return [log_short, log_complex]
 
 def get_short_smarts(disk_num=False, timeout=4):
+
+
     # Return SMART data like 0p0u0 (0 bads, 0 pendings, 0 uncorrectable)
     smarts_short = []   
     smarts_complex = []
     
     for i in range(10):
+
+        # first trying SAS smart
+        sm_short, sm_complex = get_sas_smart(i)
+
+        if (sm_short, sm_complex) != (1, 1):
+            smarts_short.append(sm_short)
+            smarts_complex.append('\n'.join(sm_complex))
+            continue
+
         try:
             # Используем subprocess.run для добавления таймаута
             process = subprocess.run(
