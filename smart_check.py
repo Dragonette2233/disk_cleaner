@@ -72,12 +72,13 @@ def get_short_smarts(disk_num=False, timeout=4):
         if (sm_short, sm_complex) != (1, 1):
             smarts_short.append(sm_short)
             smarts_complex.append('\n'.join(sm_complex))
+            print('con')
             continue
 
         try:
             # Используем subprocess.run для добавления таймаута
             process = subprocess.run(
-                f'"{SMART_CTL_EX}" -A /dev/pd{i}',  # Enclose the path in quotes to handle spaces
+                f'"{SMART_CTL_EX}" -j -A /dev/pd{i}',  # Enclose the path in quotes to handle spaces
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -92,34 +93,61 @@ def get_short_smarts(disk_num=False, timeout=4):
             smarts_complex.append("!timeout")
             continue
 
-        strings = stdout.split('\n')
+        strings = json.loads(stdout)
+        # print(i)
+        # print(strings.keys())
 
         smart_short_view = []
         smart_complex_view = []
+        try:
+            sm_ = strings['ata_smart_attributes']['table']
 
-        for line in strings:
-            line_as_list = line.split()
+            for i in sm_:
+                raw_value = i['raw']['string']
+                match i['id']:
+                    case 5:
+                        if len(raw_value.split()) > 1:
+                            raw_value = raw_value[0]
+                        smart_short_view.append(raw_value)
+                        smart_complex_view.append(f"Relocated -- {raw_value}")
+                    case 197:
+                        smart_short_view.append('p' + raw_value)
+                        smart_complex_view.append(f"Current pending -- {raw_value}")
+                    case 198:
+                        smart_short_view.append('u' + raw_value)
+                        smart_complex_view.append(f"Offline uncorrectable -- {raw_value}")
+                    case 199:
+                        smart_complex_view.append(f"Ultra DMA CRC -- {raw_value}")
+                    case 9:
+                        smart_complex_view.insert(0, f"Power on hours -- {raw_value}")
+
+            # print(sm_)
+        except KeyError:
+            ...
+
+        # for line in strings:
+        #     line_as_list = line.split()
             
-            # print(line_as_list)
-            if line_as_list:
+        #     # print(line_as_list)
+        #     if line_as_list:
                 
-                if line_as_list[0] in ('1', '4', '5', '9', '197', '198', '199'):
-                    # print(len(line_as_list))
+        #         if line_as_list[0] in ('1', '4', '5', '9', '197', '198', '199'):
+        #             # print(len(line_as_list))
                         
-                    match line_as_list[0]:
-                        case '5':
-                            smart_short_view.append(line_as_list[9])
-                            smart_complex_view.append(f"Relocated -- {line_as_list[9]}")
-                        case '197':
-                            smart_short_view.append('p' + line_as_list[9])
-                            smart_complex_view.append(f"Current pending -- {line_as_list[9]}")
-                        case '198':
-                            smart_short_view.append('u' + line_as_list[9])
-                            smart_complex_view.append(f"Offline uncorrectable -- {line_as_list[9]}")
-                        case '199':
-                            smart_complex_view.append(f"Ultra DMA CRC -- {line_as_list[9]}")
-                        case '9':
-                            smart_complex_view.insert(0, f"Power on hours -- {line_as_list[9]}")
+        #             match line_as_list[0]:
+        #                 case '5':
+        #                     smart_short_view.append(line_as_list[9])
+        #                     smart_complex_view.append(f"Relocated -- {line_as_list[9]}")
+        #                 case '197':
+        #                     smart_short_view.append('p' + line_as_list[9])
+        #                     smart_complex_view.append(f"Current pending -- {line_as_list[9]}")
+        #                 case '198':
+        #                     smart_short_view.append('u' + line_as_list[9])
+        #                     smart_complex_view.append(f"Offline uncorrectable -- {line_as_list[9]}")
+        #                 case '199':
+        #                     smart_complex_view.append(f"Ultra DMA CRC -- {line_as_list[9]}")
+        #                 case '9':
+        #                     smart_complex_view.insert(0, f"Power on hours -- {line_as_list[9]}")
         
         
         short_string = ''.join(i for i in smart_short_view)
