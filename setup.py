@@ -51,7 +51,7 @@ executables = [Executable("main.py", base="gui", icon="hddc.ico", target_name='h
 
 setup(
     name="HDD-Handler",
-    version="1.42.1",
+    version="1.5",
     description="HDD-Handler",
     options={
         "build_exe": build_exe_options,

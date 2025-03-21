@@ -509,8 +509,8 @@ class DiskApp(QWidget):
                 self.disk_labels['smart_data'][i].d_update(complex_sm[i])
 
 
-                if inf.startswith('wc'):
-                    if inf.count('0') != 4:
+                if inf.startswith('wu'):
+                    if inf.count('0') != 2:
                         self.disk_labels['smart_data'][i].setStyleSheet("color: yellow;")
                     else:
                         self.disk_labels['smart_data'][i].setStyleSheet("color: white;")

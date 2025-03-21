@@ -44,14 +44,15 @@ def get_sas_smart(disk_num=False, timeout=4):
     w_corr = write_e['total_errors_corrected']
     w_uncorr = write_e['total_uncorrected_errors']
 
-    log_short = f"wc{w_corr}rc{r_corr}wu{w_uncorr}ru{r_uncorr}"
+    log_short = f"wu{w_uncorr}ru{r_uncorr}"
     log_complex = [
         "Read/Write Errors",
         "-----------------",
+        f"Write Uncorrected - {w_uncorr}",
+        f"Read Uncorrected - {r_uncorr}",
         f"Write Corrected - {w_corr}",
         f"Read Corrected - {r_corr}",
-        f"Write Uncorrected - {w_uncorr}",
-        f"Read Uncorrected - {r_uncorr}"
+        
     ]
 
     return [log_short, log_complex]
@@ -129,3 +130,4 @@ def get_short_smarts(disk_num=False, timeout=4):
         smarts_complex.append(complex_string)
     
     return [smarts_short, smarts_complex]
+
