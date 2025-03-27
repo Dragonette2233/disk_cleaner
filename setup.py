@@ -50,9 +50,9 @@ build_exe_options = {
 executables = [Executable("main.py", base="gui", icon="hddc.ico", target_name='hddc')]
 
 setup(
-    name="HDD-Handler",
-    version="1.51",
-    description="HDD-Handler",
+    name="Storage-Handler",
+    version=open('appversion').read(),
+    description="Storage-Handler",
     options={
         "build_exe": build_exe_options,
        #  "bdist_mac": bdist_mac_options,
