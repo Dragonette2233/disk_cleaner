@@ -466,7 +466,7 @@ class DiskApp(QWidget):
         self.pushsmart_button.setStyleSheet("color: #DC93CD")
 
         if disk_num:
-           smarts: list[list] = smart_check.get_short_smarts(disk_num)  
+           smarts: list[list] = smart_check.get_short_smarts(disk_num)
         else:
            smarts: list[list] = smart_check.get_short_smarts() 
         # print(smarts)
@@ -487,8 +487,16 @@ class DiskApp(QWidget):
         except queue.Empty:
             return
         
-        for i, inf in enumerate(short_sm):
+        for (i, inf), (i2, inf2) in zip(short_sm, complex_sm):
             
+            curr_smart = self.disk_labels['smart_data'][i].text()
+            
+            if curr_smart not in (inf, '[smart data]'):
+                    print(i, "is diff")
+                    self.disk_labels['smart_cache'][i].setText(curr_smart)
+                    self.disk_labels['smart_cache'][i].smart_complex += curr_smart + '\n'
+                    self.disk_labels['smart_cache'][i].set_color('#DDE3E3')
+
             if inf == '!timeout':
                 self.disk_labels['smart_data'][i].setStyleSheet("color: #E087CA;")
                 self.disk_labels['smart_data'][i].setText(inf)
@@ -497,27 +505,38 @@ class DiskApp(QWidget):
         
             if len(inf) >= 1:
 
-                curr_smart = self.disk_labels['smart_data'][i].text()
-
-                if curr_smart != inf and curr_smart != '[smart data]':
-                    self.disk_labels['smart_cache'][i].setText(curr_smart)
-                    self.disk_labels['smart_cache'][i].smart_complex += curr_smart + '\n'
-                    self.disk_labels['smart_cache'][i].set_color('#DDE3E3')
-                    
+                
 
                 self.disk_labels['smart_data'][i].setText(inf)
-                self.disk_labels['smart_data'][i].d_update(complex_sm[i])
-
+                self.disk_labels['smart_data'][i].d_update(inf2)
 
                 if inf.startswith('wu'):
-                    if inf.count('0') != 2:
+                    no_errors = inf.replace('wu', '_').replace('ru', '_') == '_0_0'
+                    if not no_errors:
                         self.disk_labels['smart_data'][i].setStyleSheet("color: yellow;")
                     else:
                         self.disk_labels['smart_data'][i].setStyleSheet("color: white;")
+
+                    if 'malfunction' in inf2:
+                        self.disk_labels['smart_data'][i].setStyleSheet("color: #ED321C;")
+                        print(inf2)
+                           
+                    continue
+                
+                
+
+
+                # temp SSD handle
+                if 'lf' in inf:
+                    print(inf)
+                    self.disk_labels['smart_data'][i].setStyleSheet("color: white;")
                     continue
 
-                bads = int(inf.split('p')[0])
-                # bads = 1
+                try:
+                    bads = int(inf.split('p')[0])
+                except ValueError:
+                    bads = int(inf.split('u')[0])
+                
                 if 'u' in inf:
                     usc = int(inf.split('u')[1])
                     pendings = int(inf.replace('p', '_').replace('u', '_').split('_')[1])

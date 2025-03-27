@@ -4,35 +4,34 @@ import json
 
 SMART_CTL_EX = os.path.join('.', 'smartmontools', 'bin', 'smartctl.exe')
 
-def get_sas_smart(disk_num=False, timeout=4):
+def get_sas_smart(disk_num, strings, timeout=4):
     
-    try:
-        # Используем subprocess.run для добавления таймаута
-        process = subprocess.run(
-            f'"{SMART_CTL_EX}" -j -l error /dev/pd{disk_num}',  # Enclose the path in quotes to handle spaces
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            shell=True,
-            timeout=timeout  # Устанавливаем таймаут в секундах
-        )
-        stdout = process.stdout
-    except subprocess.TimeoutExpired:
-        ...
+    # try:
+    #     # Используем subprocess.run для добавления таймаута
+    #     process = subprocess.run(
+    #         f'"{SMART_CTL_EX}" -j -l error /dev/pd{disk_num}',  # Enclose the path in quotes to handle spaces
+    #         stdin=subprocess.PIPE,
+    #         stdout=subprocess.PIPE,
+    #         stderr=subprocess.PIPE,
+    #         text=True,
+    #         shell=True,
+    #         timeout=timeout  # Устанавливаем таймаут в секундах
+    #     )
+    #     stdout = process.stdout
+    # except subprocess.TimeoutExpired:
+    #     ...
     
-    result = json.loads(stdout)
+    # result = json.loads(stdout)
 
-    status = result['smartctl']['exit_status']
+    status = strings['smartctl']['exit_status']
 
 
-    if status != 0:
-    
+    if status not in (0, 8):
         return (1, 1)
 
 
     try:
-        errors = result['scsi_error_counter_log']
+        errors = strings['scsi_error_counter_log']
     except KeyError:
         return (1, 1)
 
@@ -51,34 +50,40 @@ def get_sas_smart(disk_num=False, timeout=4):
         f"Write Uncorrected - {w_uncorr}",
         f"Read Uncorrected - {r_uncorr}",
         f"Write Corrected - {w_corr}",
-        f"Read Corrected - {r_corr}",
-        
+        f"Read Corrected - {r_corr}",   
     ]
+
+    if status == 8 or strings["smart_status"]["passed"] is False:
+        smart_status = strings["smart_status"]["scsi"]
+        asc = smart_status['asc']
+        ascq = smart_status['ascq']
+        message = smart_status['ie_string']
+        log_complex.append(f"Disk malfunction: ASC/ASCQ - {asc}/{ascq} | {message}")
 
     return [log_short, log_complex]
 
-def get_short_smarts(disk_num=False, timeout=4):
+def get_short_smarts(disk_num=False, timeout=6):
 
 
     # Return SMART data like 0p0u0 (0 bads, 0 pendings, 0 uncorrectable)
-    smarts_short = []   
+    smarts_short = []
     smarts_complex = []
     
     for i in range(10):
 
         # first trying SAS smart
-        sm_short, sm_complex = get_sas_smart(i)
+        # sm_short, sm_complex = get_sas_smart(i)
 
-        if (sm_short, sm_complex) != (1, 1):
-            smarts_short.append(sm_short)
-            smarts_complex.append('\n'.join(sm_complex))
-            print('con')
-            continue
+        # if (sm_short, sm_complex) != (1, 1):
+        #     smarts_short.append(sm_short)
+        #     smarts_complex.append('\n'.join(sm_complex))
+        #     print('con')
+        #     continue
 
         try:
             # Используем subprocess.run для добавления таймаута
             process = subprocess.run(
-                f'"{SMART_CTL_EX}" -j -A /dev/pd{i}',  # Enclose the path in quotes to handle spaces
+                f'"{SMART_CTL_EX}" -j -a /dev/pd{i}',  # Enclose the path in quotes to handle spaces
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -89,11 +94,20 @@ def get_short_smarts(disk_num=False, timeout=4):
             stdout = process.stdout
         except subprocess.TimeoutExpired:
             # Обработка таймаута: добавляем "!timeout" в результаты
-            smarts_short.append("!timeout")
-            smarts_complex.append("!timeout")
+            smarts_short.append((i, "!timeout"))
+            smarts_complex.append((i, "!timeout"))
             continue
 
         strings = json.loads(stdout)
+
+        if not strings.get('ata_smart_attributes'):
+            sm_short, sm_complex = get_sas_smart(i, strings)
+            # print(sm_short,  f"of {i}")
+            if sm_short  != 1:
+                smarts_short.append((i, sm_short))
+                smarts_complex.append((i, '\n'.join(sm_complex)))
+            continue
+
         # print(i)
         # print(strings.keys())
 
@@ -102,9 +116,9 @@ def get_short_smarts(disk_num=False, timeout=4):
         try:
             sm_ = strings['ata_smart_attributes']['table']
 
-            for i in sm_:
-                raw_value = i['raw']['string']
-                match i['id']:
+            for s in sm_:
+                raw_value = s['raw']['string']
+                match s['id']:
                     case 5:
                         if len(raw_value.split()) > 1:
                             raw_value = raw_value[0]
@@ -120,7 +134,18 @@ def get_short_smarts(disk_num=False, timeout=4):
                         smart_complex_view.append(f"Ultra DMA CRC -- {raw_value}")
                     case 9:
                         smart_complex_view.insert(0, f"Power on hours -- {raw_value}")
-
+                    case 171: #nand write
+                        smart_short_view.append('nw' + raw_value)
+                        smart_complex_view.append(f'NAND Write fail count -- {raw_value}')
+                    case 172: # nand erase
+                        smart_short_view.append('ne' + raw_value)
+                        smart_complex_view.append(f'NAND Erase fail count -- {raw_value}')
+                    case 187:
+                        smart_short_view.append('re' + raw_value)
+                        smart_complex_view.append(f'Uncorrectable errors -- {raw_value}')
+                    case 231:
+                        smart_short_view.append('lf' + raw_value)
+                        smart_complex_view.append(f"SSD life left / Percentage used -- {raw_value}")
             # print(sm_)
         except KeyError:
             ...
@@ -154,8 +179,8 @@ def get_short_smarts(disk_num=False, timeout=4):
         # print(short_string)
         complex_string = '\n'.join(i for i in smart_complex_view)
         
-        smarts_short.append(short_string)
-        smarts_complex.append(complex_string)
+        smarts_short.append((i, short_string))
+        smarts_complex.append((i, complex_string))
     
     return [smarts_short, smarts_complex]
 
