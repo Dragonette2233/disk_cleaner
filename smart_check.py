@@ -43,8 +43,14 @@ def get_sas_smart(disk_num, strings, timeout=4):
     w_corr = write_e['total_errors_corrected']
     w_uncorr = write_e['total_uncorrected_errors']
 
+    try:
+        power_on_time = strings.get('power_on_time').get('hours')
+    except AttributeError:
+        power_on_time = '? '
+
     log_short = f"wu{w_uncorr}ru{r_uncorr}"
     log_complex = [
+        f"Power on hours - {power_on_time}h",
         "Read/Write Errors",
         "-----------------",
         f"Write Uncorrected - {w_uncorr}",
@@ -120,8 +126,9 @@ def get_short_smarts(disk_num=False, timeout=6):
                 raw_value = s['raw']['string']
                 match s['id']:
                     case 5:
-                        if len(raw_value.split()) > 1:
-                            raw_value = raw_value[0]
+                        raw_ext = raw_value.split()
+                        if len(raw_ext) > 1:
+                            print("RAW IS", raw_value)
                         smart_short_view.append(raw_value)
                         smart_complex_view.append(f"Relocated -- {raw_value}")
                     case 197:
@@ -142,7 +149,7 @@ def get_short_smarts(disk_num=False, timeout=6):
                         smart_complex_view.append(f'NAND Erase fail count -- {raw_value}')
                     case 187:
                         smart_short_view.append('re' + raw_value)
-                        smart_complex_view.append(f'Uncorrectable errors -- {raw_value}')
+                        smart_complex_view.append(f'Read uncorrectable errors -- {raw_value}')
                     case 231:
                         smart_short_view.append('lf' + raw_value)
                         smart_complex_view.append(f"SSD life left / Percentage used -- {raw_value}")

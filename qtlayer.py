@@ -532,28 +532,38 @@ class DiskApp(QWidget):
                     print(inf)
                     self.disk_labels['smart_data'][i].setStyleSheet("color: white;")
                     continue
-
-                try:
-                    bads = int(inf.split('p')[0])
-                except ValueError:
-                    bads = int(inf.split('u')[0])
                 
-                if 'u' in inf:
-                    usc = int(inf.split('u')[1])
-                    pendings = int(inf.replace('p', '_').replace('u', '_').split('_')[1])
+                
+                self.disk_labels['smart_data'][i].setStyleSheet("color: #16F76E;")
+                for d in inf:
+                    # print(d)
+                    if d.isdigit() and int(d) > 0:
+                        self.disk_labels['smart_data'][i].setStyleSheet("color: #F7A116;")
+                        # break
+                    # else:
+                    #     self.disk_labels['smart_data'][i].setStyleSheet("color: #16F76E;")
+
+                # try:
+                #     bads = int(inf.split('p')[0])
+                # except ValueError:
+                #     bads = int(inf.split('u')[0])
+                
+                # if 'u' in inf:
+                #     usc = int(inf.split('u')[1])
+                #     pendings = int(inf.replace('p', '_').replace('u', '_').split('_')[1])
                     
-                    if usc > 0 or pendings > 0:
-                        self.disk_labels['smart_data'][i].setStyleSheet("color: #8BF011;")
+                #     if usc > 0 or pendings > 0:
+                #         self.disk_labels['smart_data'][i].setStyleSheet("color: #8BF011;")
                                                 
                 
-                if bads > 0:
-                    self.disk_labels['smart_data'][i].setStyleSheet("color: #F7A116;")
+                # if bads > 0:
+                #     self.disk_labels['smart_data'][i].setStyleSheet("color: #F7A116;")
                     
-                if bads > 20:
-                    self.disk_labels['smart_data'][i].setStyleSheet("color: #F74D16;")
+                # if bads > 20:
+                #     self.disk_labels['smart_data'][i].setStyleSheet("color: #F74D16;")
                         
-                if inf == '0p0u0' or inf == '0':
-                    self.disk_labels['smart_data'][i].setStyleSheet("color: #16F76E;")
+                # if inf == '0p0u0' or inf == '0':
+                #     self.disk_labels['smart_data'][i].setStyleSheet("color: #16F76E;")
 
             
     

@@ -23,7 +23,7 @@ except ImportError:
 
 include_files = [
     os.path.join(".", ".env", "Lib", "site-packages", "pywin32_system32", "pywintypes312.dll"),
-    'victoriapath', 'hddc.ico', ("smartmontools", "smartmontools")
+    'victoriapath', 'hddc.ico', ("smartmontools", "smartmontools",), 'appversion'
 ]
 if get_qt_plugins_paths:
     # Inclusion of extra plugins (since cx_Freeze 6.8b2)

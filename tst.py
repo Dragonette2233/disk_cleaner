@@ -1,5 +1,5 @@
-inf = '0u3'
+inf = '0u0p0'
 
-pendings = int(inf.replace('p', '_').replace('u', '_').split('_')[1])
-
-print(pendings)
+for i in inf:
+    if i.isdigit() and int(i) == 0:
+        print('d')
