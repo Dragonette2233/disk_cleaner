@@ -128,6 +128,7 @@ def get_short_smarts(disk_num=False, timeout=6):
                     case 5:
                         raw_ext = raw_value.split()
                         if len(raw_ext) > 1:
+                            raw_value = raw_ext[0]
                             print("RAW IS", raw_value)
                         smart_short_view.append(raw_value)
                         smart_complex_view.append(f"Relocated -- {raw_value}")
