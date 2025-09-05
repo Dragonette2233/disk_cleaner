@@ -4,6 +4,7 @@ import time
 import ctypes
 from ctypes import wintypes
 import win32gui
+from _victoria_ui import run_victoria_script
 
 PATH = open('victoriapath', 'r', encoding='utf-8').readlines()
 
@@ -96,22 +97,23 @@ def count_of_victoria_wins():
 
 def victoria_run(connected):
     # Проверка существования программы
-    # if not os.path.exists(VICTORIA_PATH):
-    #     raise FileNotFoundError(f"Программа не найдена по пути: {VICTORIA_PATH}")
 
-    # Открытие 8 экземпляров программы
     processes = []
     for i in connected:
-        update_last_api_device(i)
-        print(i)
-        proc = subprocess.Popen(VICTORIA_PATH)
-        while count_of_victoria_wins() < i:
-            time.sleep(0.3)
-            # print('ulala')
-        processes.append(proc)
-        time.sleep(1)  # Небольшая задержка для запуска экземпляра
 
-    print(processes)
+    #    for i in connected:
+        update_last_api_device(i)
+        proc = subprocess.Popen(VICTORIA_PATH)
+
+        # Ждём, пока количество окон не увеличится
+        prev_count = len(processes)
+        while count_of_victoria_wins() <= prev_count:
+            time.sleep(0.3)
+
+        processes.append(proc)
+        time.sleep(1)  # Небольшая задержка для стабильности
+
+
         # Начальные координаты и шаг
     START_X, START_Y = 50, 25
     STEP_X, STEP_Y = 24, 71
@@ -120,6 +122,8 @@ def victoria_run(connected):
     update_last_api_device(1)
     # Перемещение окон
     for i, proc in enumerate(processes):
+        
+
         hwnd = None
         for _ in range(20):  # Попытка найти окно
             hwnd = get_window_by_pid_and_title(proc.pid)
@@ -136,5 +140,3 @@ def victoria_run(connected):
                 print(f"Не удалось переместить окно PID {proc.pid}, HWND {hwnd}")
         else:
             print(f"Окно не найдено для процесса PID {proc.pid}")
-    
-    # print('lll')
