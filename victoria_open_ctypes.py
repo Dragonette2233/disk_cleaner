@@ -4,7 +4,7 @@ import time
 import ctypes
 from ctypes import wintypes
 import win32gui
-from _victoria_ui import run_victoria_script
+from victoria.ui import run_victoria_script
 
 PATH = open('victoriapath', 'r', encoding='utf-8').readlines()
 

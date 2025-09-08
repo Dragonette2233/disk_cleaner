@@ -71,23 +71,6 @@ def click_hwnd_async(hwnd):
     PostMessageW(hwnd, WM_LBUTTONDOWN, 1, lparam)
     PostMessageW(hwnd, WM_LBUTTONUP,   0, lparam)
 
-# def ensure_checkbox_checked(hwnd, label):
-#     state = SendMessageW(hwnd, BM_GETCHECK, 0, 0)
-#     if state == BST_CHECKED:
-#         print(f"[OK] Чекбокс '{label}' уже включён")
-#         return True
-#     print(f"[INFO] Чекбокс '{label}' выключен → кликаем…")
-#     click_hwnd_async(hwnd)
-#     time.sleep(0.5)
-#     for _ in range(5):
-#         state = SendMessageW(hwnd, BM_GETCHECK, 0, 0)
-#         if state == BST_CHECKED:
-#             print(f"[OK] Чекбокс '{label}' теперь включён")
-#             return True
-#         time.sleep(0.2)
-#     print(f"[WARN] Не удалось подтвердить включение чекбокса '{label}'")
-#     return False
-
 def click_hwnd(hwnd):
     SendMessageW(hwnd, BM_CLICK, 0, 0)
     SendMessageW(hwnd, WM_LBUTTONDOWN, 1, 0)

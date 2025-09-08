@@ -2,7 +2,9 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QListWidget, QVBoxLayout, QListWidgetItem, QLabel,
     QHBoxLayout, QPushButton, QCheckBox, QMenu, QFileDialog, QMessageBox
 )
-from _victoria_ui import cycle_victoria_script
+
+from victoria.percentage import get_percentage
+from victoria.ui import cycle_victoria_script
 from functools import partial
 from victoria_open_ctypes import VICTORIA_PATH, CONFIG_PATH
 import victoria_open_ctypes
@@ -27,22 +29,34 @@ class ThreadData:
         n_connected_drives = 0
         self.disk_info.clear()
         for i in range(10):
+            # print(i)
             info = du.get_disk_info(i)
+            percentage = get_percentage(i)
+            # print(percentage)
+            # print(percentage)
             if info == 'OUT':
-                self.disk_info.append((i, "! Disconnected !", "", "UL", False))
+                self.disk_info.append((i, "! Disconnected !", "", "UL", False, percentage))
             elif isinstance(info, tuple):
                 di = list(info)
                 di.append(is_disk_sleeping(i))
+                di.append(percentage)
                 self.disk_info.append(di)
                 n_connected_drives += 1
             else:
-                self.disk_info.append((i, "Not connected", "", "UL", False))
+                self.disk_info.append((i, "Not connected", "", "UL", False, percentage))
+            
+            # print(self.disk_info[i])
+
         n_part_sequence = ''.join(str(i[3]) + str(i[-1]) for i in self.disk_info)
         self.is_refresh_require = (
             self.cache_part_sequence != n_part_sequence or
             self.cache_connected_drives != n_connected_drives
         )
+
+        
+
         if self.is_refresh_require:
+            # print(self.disk_info)
             self.disks_queue.put(self.disk_info.copy())
             self.cache_connected_drives = n_connected_drives
             self.cache_part_sequence = n_part_sequence
@@ -53,7 +67,12 @@ class mModel(QLabel):
         super().__init__()
         self.parent_: DiskApp = parent
         self.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.customContextMenuRequested.connect(lambda: self.parent_.show_context_menu(self, idx))
+        # передаём pos в show_context_menu
+        self.customContextMenuRequested.connect(
+            lambda pos: self.parent_.show_context_menu(self, idx, pos)
+        )
+
+
 
 class PersistentToolTip(QLabel):
     def __init__(self, parent=None):
@@ -75,6 +94,12 @@ class PersistentToolTip(QLabel):
         self.adjustSize()
         self.move(pos)
         self.show()
+
+class mPercentage(QLabel):
+    def __init__(self):
+        super().__init__()
+        self.setStyleSheet("color: #3BF4FA;")
+        self.setStyleSheet(f"color: pink;")
 
 class mSmart(QLabel):
     def __init__(self):
@@ -132,12 +157,17 @@ class DiskApp(QWidget):
             'serial': [mSerial() for _ in range(10)],
             'smart_data': [mSmart() for _ in range(10)],
             'smart_cache': [mSmart() for _ in range(10)],
+            'percentage': [mPercentage() for _ in range(10)],
             'checkbox': [mCheckBox(idx) for idx in range(10)]
         }
 
         self.main_layout = QVBoxLayout()
         self._configure_markers_info()
         self.main_layout.addWidget(self.disk_list)
+
+        # DEBUG
+        # self.DEBUG_BTN = QPushButton("DEBUG")
+        # self.DEBUG_BTN.clicked.connect()
 
         self.cleard_button = QPushButton("DP Clear DEFAULT")
         self.clearr_button = QPushButton("DP Clear RESCAN")
@@ -187,7 +217,9 @@ class DiskApp(QWidget):
         self.clipboard = QApplication.clipboard()
         self.dtimer = QTimer(); self.dtimer.timeout.connect(self.refresh_disk_info); self.dtimer.start(500)
         self.stimer = QTimer(); self.stimer.timeout.connect(self.refresh_smart_info); self.stimer.start(500)
-        self.thread_data.update(); self.configure_disk_labels(); self.refresh_disk_info()
+        self.thread_data.update() 
+        self.configure_disk_labels()
+        self.refresh_disk_info()
 
         threading.Thread(target=self.run_update_thread, daemon=True).start()
         self.clearing_thread = None
@@ -256,27 +288,45 @@ class DiskApp(QWidget):
         while True:
             self.thread_data.update(); time.sleep(1)
 
-    def show_context_menu(self, lb: QLabel, idx=0):
+    def show_context_menu(self, lb: QLabel, idx=0, pos=None):
         context_menu = QMenu(self)
-        position = lb.pos()
+
         actions = {
             "Clear (Default)": lambda: self.clear_default(single_idx=idx),
             "Clear (Rescan)": lambda: self.clear_rescan(single_idx=idx),
-            "Send sleep": lambda: threading.Thread(target=scsi_sleep_command, args=((idx,),), daemon=True).start(),
+            "Send sleep": lambda: threading.Thread(
+                target=scsi_sleep_command, args=((idx,),), daemon=True
+            ).start(),
             "Copy": lambda: self.clipboard.setText(' '.join(lb.text().split()[1:]).strip()),
             "SMART": lambda: self.clipboard.setText(' '.join(lb.text().split()[1:]).strip())
         }
-        action = context_menu.exec_(lb.mapToGlobal(position))
-        if action and action.text() in actions: actions[action.text()]()
+
+        # добавляем пункты меню
+        for text in actions.keys():
+            context_menu.addAction(text)
+
+        # позиция — где кликнули
+        global_pos = lb.mapToGlobal(pos) if pos else lb.mapToGlobal(lb.rect().center())
+        action = context_menu.exec_(global_pos)
+
+        if action and action.text() in actions:
+            actions[action.text()]()
+
+
 
     def configure_disk_labels(self):
         for i in range(10):
             item, widget, h_layout = QListWidgetItem(), QWidget(), QHBoxLayout()
-            self.disk_labels['model'][i].setText(f"[{i}]  None"); self.disk_labels['model'][i].setStyleSheet("color: red;")
-            self.disk_labels['smart_data'][i].setText("[smart data]"); self.disk_labels['smart_cache'][i].setText("[smart cache]")
+            self.disk_labels['model'][i].setText(f"[{i}]  None")
+            self.disk_labels['model'][i].setStyleSheet("color: red;")
+            self.disk_labels['smart_data'][i].setText("[smart data]") 
+            self.disk_labels['smart_cache'][i].setText("[smart cache]")
+            self.disk_labels['percentage'][i].setText("-%")
             self.disk_labels['serial'][i].setText("S/N: 223")
-            for key in ('circle','model','serial','smart_data','smart_cache','checkbox'):
+
+            for key in ('circle','model','serial','smart_data','smart_cache','percentage','checkbox'):
                 h_layout.addWidget(self.disk_labels[key][i])
+
             h_layout.setContentsMargins(0,0,0,0)
             widget.setLayout(h_layout); item.setSizeHint(widget.sizeHint())
             self.disk_list.addItem(item); self.disk_list.setItemWidget(item, widget)
@@ -323,10 +373,11 @@ class DiskApp(QWidget):
         if self.thread_data.is_refresh_require:
             try:
                 disk_info = self.thread_data.disks_queue.get_nowait()
+                
             except queue.Empty:
                 return
 
-            for i, model, serial, p_info, is_sleep in disk_info:
+            for i, model, serial, p_info, is_sleep, percentage in disk_info:
                 match p_info, model, is_sleep:
                     case p_info, model, 'IO':
                         model = model + ' (I/O)'
@@ -353,6 +404,10 @@ class DiskApp(QWidget):
 
                 if serial.startswith('0000'):
                     serial = "..."
+
+                
+                if percentage:
+                    self.disk_labels['percentage'][i].setText(f"{percentage}%")
 
                 self.disk_labels['circle'][i].setStyleSheet(f"background-color: {cclr}; border-radius: 7.5px;")
 
