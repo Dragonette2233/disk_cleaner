@@ -60,7 +60,10 @@ def get_percentage(i):
     text_list = [text for _, cls, text in elements if cls == "TStaticText"]
 
     if len(text_list) < 5:
-        raise RuntimeError("Не найден нужный элемент TStaticText")
-
-    return text_list[4]  # возвращаем 5-й элемент
+        return None
+    
+    try:
+        return float(text_list[4])  # возвращаем 5-й элемент
+    except:
+        return None
 
