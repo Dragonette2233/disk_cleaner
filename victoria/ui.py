@@ -201,7 +201,8 @@ def run_victoria_script(drive_id: int, method: str):
 
     user32.EnumWindows(EnumWindowsProc(enum_windows), 0)
     if not main_hwnd:
-        raise SystemExit(f"Окно '{window_title}' не найдено")
+        return None
+        #  SystemExit(f"Окно '{window_title}' не найдено")
     print("Нашли окно:", get_window_text(main_hwnd))
 
     # --- перечисление дочерних контролов ---
