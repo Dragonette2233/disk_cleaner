@@ -17,8 +17,8 @@ class ENG:
     err = "err"
     sleep = "sleep"
 
-    smart_data = "[smart data]"
-    smart_cache = "[smart cache]"
+    smart_data = "[sm_data]"
+    smart_cache = "[sm_cache]"
     calling_SMART = "calling SMART..."
     SMART_updated = "SMART updated."
 

@@ -63,7 +63,7 @@ def get_percentage(i):
         return None
     
     try:
-        return float(text_list[4])  # возвращаем 5-й элемент
+        return float(text_list[4].strip().replace(',', '.'))
     except:
         return None
 

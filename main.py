@@ -14,8 +14,17 @@ def run_as_admin():
         
 if __name__ == "__main__":
     run_as_admin()
+    # app = QApplication(sys.argv)
+    # # app.setStyle("Fusion")
+    # window = DiskApp()
+    # window.show()
+    # sys.exit(app.exec_())
+
     app = QApplication(sys.argv)
-    # app.setStyle("Fusion")
-    window = DiskApp()
-    window.show()
+    try:
+        window = DiskApp()
+        window.show()
+    except Exception as ex_:
+        with open("last_ex.log", "w+", encoding="utf-8") as file:
+            file.write(str(ex_))
     sys.exit(app.exec_())
