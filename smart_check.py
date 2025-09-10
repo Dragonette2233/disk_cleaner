@@ -68,14 +68,14 @@ def get_sas_smart(disk_num, strings, timeout=4):
 
     return [log_short, log_complex]
 
-def get_short_smarts(disk_num=False, timeout=6):
+def get_short_smarts(selected_idx=False, timeout=6):
 
 
     # Return SMART data like 0p0u0 (0 bads, 0 pendings, 0 uncorrectable)
     smarts_short = []
     smarts_complex = []
     
-    for i in range(10):
+    for i in selected_idx:
 
         # first trying SAS smart
         # sm_short, sm_complex = get_sas_smart(i)

@@ -12,10 +12,10 @@ are intentionally left untouched; this layer only orchestrates UI and threading.
 """
 
 import os
-import sys
 import time
 import queue
 import threading
+from datetime import datetime
 from functools import partial
 from typing import Iterable, List, Optional, Sequence, Tuple
 
@@ -54,6 +54,11 @@ STYLE_APP = """
 QWidget { background-color: #2B2F31; color: #FFFFFF; }
 QLabel { font-size: 13px; font-weight: bold; }
 """
+
+HL_YELLOW_BG = "#FFF59D"   # мягкий желтый на темной теме
+HL_GREEN_BG  = "#18ff95"   # светло-зеленый на полсекунды
+HL_GREY_BG   = "#f0f8ff"   # нейтральный серый фон
+
 
 COLOR_PRIMARY = "#27C4E2"
 COLOR_WHITE = "white"
@@ -279,6 +284,11 @@ class DiskApp(QWidget):
         self._configure_markers_info()
         self.main_layout.addWidget(self.disk_list)
 
+        self.debug_label = QLabel("Last Action: ...")
+        self.debug_label.setStyleSheet(f"color:rgb(0, 0, 0); font-size: 12px; background-color: {HL_GREY_BG}")
+        self.main_layout.addWidget(self.debug_label)
+
+
         self.cleard_button = QPushButton("DP Clear DEFAULT")
         self.clearr_button = QPushButton("DP Clear RESCAN")
         self.eject_button = QPushButton("Sleep (SCSI)")
@@ -339,17 +349,39 @@ class DiskApp(QWidget):
         self.clr_thr_timer = QTimer(); self.clr_thr_timer.timeout.connect(self.clearing_activity)
         self.scsi_sleep_thread: Optional[threading.Thread] = None
         self.sleep_thr_timer = QTimer(); self.sleep_thr_timer.timeout.connect(self.scsi_sleep_activity)
+        self.smart_thread: Optional[threading.Thread] = None
+        self.smart_thr_timer = QTimer(); self.smart_thr_timer.timeout.connect(self.smart_activity)
 
+    # from datetime import datetime
+
+    def _set_label_bg(self, label: QLabel, bg: str) -> None:
+        """Аккуратно применяет фон к QLabel, не трогая цвет текста."""
+        base = self.debug_label.styleSheet().rstrip("; ")
+        label.setStyleSheet(f"{base}; background-color: {bg};")
+
+    def log_action(self, action: str, processing=False) -> None:
+        
+    
+        """Записывает последнюю операцию в debug_label с текущим временем."""
+
+
+        if not processing:
+            self._set_label_bg(self.debug_label, HL_GREEN_BG)
+            QTimer.singleShot(1000, lambda: self._set_label_bg(self.debug_label, HL_GREY_BG))
+        else:
+            self._set_label_bg(self.debug_label, HL_YELLOW_BG)
+
+        now = datetime.now().strftime("%H:%M:%S")
+        # self.debug_label.setStyleSheet()
+        self.debug_label.setText(f"Last Action: {action} [{now}]")
+
+ 
     # ------------- helpers -------------
-    def _set_button_busy(self, btn: QPushButton, text: str) -> None:
+    def _set_button_busy(self, btn: QPushButton) -> None:
         btn.setDisabled(True)
-        btn.setText(text)
-        btn.setStyleSheet(f"color: {COLOR_ACTION}")
 
-    def _set_button_idle(self, btn: QPushButton, text: str) -> None:
+    def _set_button_idle(self, btn: QPushButton) -> None:
         btn.setDisabled(False)
-        btn.setText(text)
-        btn.setStyleSheet(f"color: {COLOR_WHITE}")
 
     # ------------- external actions -------------
     def victoria_open(self, connected: int = 8) -> None:  # API preserved
@@ -387,23 +419,33 @@ class DiskApp(QWidget):
     def clearing_activity(self) -> None:
         if self.clearing_thread and not self.clearing_thread.is_alive():
             self.clr_thr_timer.stop()
-            self._set_button_idle(self.cleard_button, "DP Clear DEFAULT")
-            self._set_button_idle(self.clearr_button, "DP Clear RESCAN")
+            # self._set_button_idle(self.cleard_button, "DP Clear DEFAULT")
+
+            self.log_action(action="Partition cleared")
+            self._set_button_idle(self.cleard_button)
+            self._set_button_idle(self.clearr_button)
 
     def scsi_sleep_activity(self) -> None:
         if self.scsi_sleep_thread and not self.scsi_sleep_thread.is_alive():
             self.sleep_thr_timer.stop()
-            self._set_button_idle(self.eject_button, "Sleep (SCSI)")
+            self.log_action(action="Sleep sended")
+            self._set_button_idle(self.eject_button)
+
+    def smart_activity(self) -> None:
+        if self.smart_thread and not self.smart_thread.is_alive():
+            self.smart_thr_timer.stop()
+            self.log_action("Smart UPDATED")
+            self._set_button_idle(self.pushsmart_button)
 
     def _configure_markers_info(self) -> None:
         widget = QWidget(); h_layout = QHBoxLayout(widget)
         marks = [
-            (mMark(COLOR_GREEN), "w/o parts"),
-            (mMark(COLOR_YELLOW), "with parts"),
-            (mMark(COLOR_RED), "not connected"),
-            (mMark(COLOR_GREY), "busy"),
-            (mMark(COLOR_ORANGE), "err"),
-            (mMark(COLOR_PURPLE_SLEEP), "sleep"),
+            (mMark(COLOR_GREEN), "no parts"),
+            (mMark(COLOR_YELLOW), "parts"),
+            (mMark(COLOR_RED), "disconnected"),
+            (mMark(COLOR_GREY), "BSY"),
+            (mMark(COLOR_ORANGE), "ERR"),
+            (mMark(COLOR_PURPLE_SLEEP), "SLP"),
         ]
         for mark, text in marks:
             h_layout.addWidget(mark); h_layout.addWidget(QLabel(text)); h_layout.addSpacing(10)
@@ -456,19 +498,37 @@ class DiskApp(QWidget):
 
     # ------------- SMART -------------
     def reset_smart_button(self) -> None:
-        self._set_button_idle(self.pushsmart_button, "Get SMART (smartctl)")
+        self._set_button_idle(self.pushsmart_button)
 
     def clear_smart_cache(self) -> None:
         for i in self.disk_labels["smart_cache"]:
             i.d_reset("sm_cache")
 
-    def push_smart(self, disk_num: bool = False) -> None:
-        self._set_button_busy(self.pushsmart_button, "calling SMART...")
-        smarts = smart_check.get_short_smarts(disk_num) if disk_num else smart_check.get_short_smarts()
+    def push_smart(self) -> None:
+        selected_indices = self.gather_indices()
+        if not selected_indices:
+            return  # ничего не выбрано
+
+        self._set_button_busy(self.pushsmart_button)
+        self.smart_thread = threading.Thread(
+            target=self._do_smart_job,
+            args=(selected_indices,),
+            daemon=True,
+        )
+        self.smart_thread.start()
+        self.smart_thr_timer.start(200)
+        self.log_action(f"Smart request for {selected_indices}", processing=True)
+
+    def _do_smart_job(self, indices: List[int]) -> None:
+        smarts = smart_check.get_short_smarts(indices)
         self.thread_data.smart_queue.put(smarts)
-        self._set_button_busy(self.pushsmart_button, "SMART updated.")
-        self.pushsmart_button.setStyleSheet(f"color: {COLOR_OK}")
-        self.smtimer = QTimer(); self.smtimer.setSingleShot(True); self.smtimer.timeout.connect(self.reset_smart_button); self.smtimer.start(1000)
+
+    # def smart_activity(self) -> None:
+    #     if self.smart_thread and not self.smart_thread.is_alive():
+    #         self.smart_thr_timer.stop()
+    #         self.log_action("Smart UPDATED")
+    #         self._set_button_idle(self.pushsmart_button)
+
 
     def refresh_smart_info(self) -> None:
         try:
@@ -573,7 +633,8 @@ class DiskApp(QWidget):
             )
             self.scsi_sleep_thread.start()
             self.sleep_thr_timer.start(200)
-            self._set_button_busy(self.eject_button, "SENDING SLEEP TO DEVICES...")
+            self.log_action(action=f"Sending sleep {selected_indices}", processing=True)
+            self._set_button_busy(self.eject_button)
 
     # ------------- Clear partitions -------------
     def clear_rescan(self, single_idx: bool | int = False) -> None:
@@ -588,7 +649,7 @@ class DiskApp(QWidget):
             )
             self.clearing_thread.start()
             self.clr_thr_timer.start(200)
-            self._set_button_busy(self.clearr_button, "CLEARING PARTITIONS...")
+            self._set_button_busy(self.clearr_button)
             self.cleard_button.setDisabled(True)
 
     def clear_default(self, single_idx: bool | int = False) -> None:
@@ -603,8 +664,10 @@ class DiskApp(QWidget):
             )
             self.clearing_thread.start()
             self.clr_thr_timer.start(200)
-            self._set_button_busy(self.cleard_button, "CLEARING PARTITIONS...")
-            self.clearr_button.setDisabled(True)
+            self.log_action(action=f"Clearing {selected_indices}", processing=True)
+            self._set_button_busy(self.cleard_button)
+            self._set_button_busy(self.clearr_button)
+            # self.clearr_button.setDisabled(True)
 
 
 # # =====================
