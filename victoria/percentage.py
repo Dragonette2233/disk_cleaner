@@ -43,7 +43,7 @@ def get_percentage(i):
 
     user32.EnumWindows(EnumWindowsProc(enum_windows), 0)
     if not main_hwnd:
-        return None
+        return 0
         raise RuntimeError("Окно 'Victoria 5.37' не найдено")
 
     elements = []
@@ -60,10 +60,10 @@ def get_percentage(i):
     text_list = [text for _, cls, text in elements if cls == "TStaticText"]
 
     if len(text_list) < 5:
-        return None
+        return 0
     
     try:
         return float(text_list[4].strip().replace(',', '.'))
     except:
-        return None
+        return 0
 

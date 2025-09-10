@@ -295,7 +295,7 @@ class DiskApp(QWidget):
         self.victoria_open_button = QPushButton("Victoria (open)")
         self.victoria_write_button = QPushButton("Victoria (WRITE)")
         self.victoria_read_button = QPushButton("Victoria (READ)")
-        self.victoria_autowr_button = QPushButton("Victoria (WR)")
+        self.victoria_autowr_button = QPushButton("Victoria (W-R-V)")
         self.pushsmart_button = QPushButton("Get SMART (smartctl)")
         # self.clearsmart_button = QPushButton("Clear SMART cache")
 
