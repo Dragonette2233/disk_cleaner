@@ -232,6 +232,12 @@ def run_victoria_script(drive_id: int, method: str):
         time.sleep(1)
 
     
+    # scan_hwnd = find_control("TRzBitBtn", "Scan")
+    if method != "W":
+        while not find_control("TRzBitBtn", "Scan"):
+            refresh_elements()
+            print("Waiting for scan button")
+            time.sleep(2)
 
     for cls, text in targets:
         refresh_elements()
@@ -247,5 +253,5 @@ def run_victoria_script(drive_id: int, method: str):
             click_hwnd_async(hwnd)
             if text == "Scan" and method == 'W':
                 time.sleep(1)
-                wait_dialog_and_press_yes(main_hwnd, timeout_ms=7000, poll_ms=100)
+                wait_dialog_and_press_yes(main_hwnd, timeout_ms=10000, poll_ms=100)
         time.sleep(0.5)
