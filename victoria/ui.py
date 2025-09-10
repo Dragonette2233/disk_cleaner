@@ -168,7 +168,7 @@ def wait_dialog_and_press_yes(owner_hwnd, timeout_ms=7000, poll_ms=100):
     return False
 
 def cycle_victoria_script(selected_indices):
-
+    print('cycle', selected_indices)
     for i in selected_indices[:-1]:
         run_victoria_script(i, selected_indices[-1])
 
@@ -184,6 +184,11 @@ def run_victoria_script(drive_id: int, method: str):
     elif method == 'R':
         targets = [
             ("TRzGroupButton","Read"),
+            ("TRzBitBtn","Scan"),
+        ]
+    elif method == 'V':
+        targets = [
+            ("TRzGroupButton","Verify"),
             ("TRzBitBtn","Scan"),
         ]
 
@@ -222,8 +227,9 @@ def run_victoria_script(drive_id: int, method: str):
         return None
 
     # --- сценарий ---
-    click_menu(main_hwnd, main_index=2, sub_index=0)  # Service -> Tests
-    time.sleep(1)
+    if method not in ('V', 'R'):
+        click_menu(main_hwnd, main_index=2, sub_index=0)  # Service -> Tests
+        time.sleep(1)
 
     
 

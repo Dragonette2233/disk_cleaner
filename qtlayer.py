@@ -295,6 +295,7 @@ class DiskApp(QWidget):
         self.victoria_open_button = QPushButton("Victoria (open)")
         self.victoria_write_button = QPushButton("Victoria (WRITE)")
         self.victoria_read_button = QPushButton("Victoria (READ)")
+        self.victoria_autowr_button = QPushButton("Victoria (WR)")
         self.pushsmart_button = QPushButton("Get SMART (smartctl)")
         # self.clearsmart_button = QPushButton("Clear SMART cache")
 
@@ -305,6 +306,7 @@ class DiskApp(QWidget):
         self.victoria_open_button.clicked.connect(partial(self.victoria_open, 1))
         self.victoria_write_button.clicked.connect(partial(self.start_victoria_script, "W"))
         self.victoria_read_button.clicked.connect(partial(self.start_victoria_script, "R"))
+        self.victoria_autowr_button.clicked.connect(self.start_victoria_autowrite)
         self.pushsmart_button.clicked.connect(self.push_smart)
         # self.clearsmart_button.clicked.connect(self.clear_smart_cache)
 
@@ -316,6 +318,7 @@ class DiskApp(QWidget):
         victoria_layout.addWidget(self.victoria_open_button)
         victoria_layout.addWidget(self.victoria_write_button)
         victoria_layout.addWidget(self.victoria_read_button)
+        victoria_layout.addWidget(self.victoria_autowr_button)
 
         smart_layout = QHBoxLayout()
         smart_layout.addWidget(self.pushsmart_button)
@@ -342,16 +345,27 @@ class DiskApp(QWidget):
         self.thread_data.update()
         self.configure_disk_labels()
         self.refresh_disk_info()
-
+        
         # Background workers
         threading.Thread(target=self.run_update_thread, daemon=True).start()
+        
         self.clearing_thread: Optional[threading.Thread] = None
         self.clr_thr_timer = QTimer(); self.clr_thr_timer.timeout.connect(self.clearing_activity)
         self.scsi_sleep_thread: Optional[threading.Thread] = None
         self.sleep_thr_timer = QTimer(); self.sleep_thr_timer.timeout.connect(self.scsi_sleep_activity)
         self.smart_thread: Optional[threading.Thread] = None
         self.smart_thr_timer = QTimer(); self.smart_thr_timer.timeout.connect(self.smart_activity)
+        print('bbom')
+        # self.victoria_thread = Optional[threading.Thread] = None
+        print('bbom')
+        
 
+        # VICTORIA WRV STATE
+
+        self.victoria_states: dict[int, str] = {}  # ключ = номер диска, значение = "IDLE" | "WRITE" | "READ"
+        self.victoria_monitor_thread: Optional[threading.Thread] = None
+
+        
     # from datetime import datetime
 
     def _set_label_bg(self, label: QLabel, bg: str) -> None:
@@ -613,17 +627,96 @@ class DiskApp(QWidget):
         return selected_indices if selected_indices else None
 
     # ------------- Victoria scripts -------------
-    def start_victoria_script(self, method: str) -> None:
+    def start_victoria_script(self, method: str, single_drive=0) -> None:
+
+        # if single_drive:
+        #     selected_indices = [single_drive, ]
+        # else:
         selected_indices = self.gather_indices()
+
+
+
         if selected_indices:
             selected_indices.append(method)  # API/behavior preserved
-            self.scsi_sleep_thread = threading.Thread(
+            threading.Thread(
                 target=cycle_victoria_script,
                 args=(selected_indices,),
                 daemon=True,
-            )
-            self.scsi_sleep_thread.start()
+            ).start()
+            # self.victoria_state = "WRITE"
+            
 
+    
+    def start_victoria_autowrite(self) -> None:
+
+        self.log_action(f"Started autowrite")
+
+        selected_indices = self.gather_indices()
+        if not selected_indices:
+            return
+
+        
+        # for idx in selected_indices:
+        for i in selected_indices: 
+            if "Not connected" in self.disk_labels["model"][i].text():
+                print('no disk in', i)
+                continue
+            self.victoria_states[i] = "WRITE"
+            threading.Thread(
+                target=self._monitor_single_drive,
+                args=(i,),
+                daemon=True,
+            ).start()
+        # self.victoria_states[idx] = "WRITE"
+        # self.log_action(f"Victoria WRITE started for [{selected_indices}]")
+        self.start_victoria_script("W")
+
+        # print(f"Started autowrite for: {idx}")
+        
+    
+    def _get_current_percentage(self, drive_idx):
+        text = self.disk_labels["percentage"][drive_idx].text()
+        if text.endswith("%"):
+            try:
+                value = float(text.replace("%", ""))
+            except ValueError:
+                value = 0
+            
+            return value
+
+    def _monitor_single_drive(self, drive_idx: int) -> None:
+        # def _monitor_single_drive(self, drive_idx: int) -> None:
+        while self.victoria_states.get(drive_idx) == "WRITE":
+            
+            perc_value = self._get_current_percentage(drive_idx)
+
+            if perc_value >= 100.0:
+                time.sleep(5)
+                self.disk_labels["percentage"][drive_idx].setText("-%")
+                # переключаем этот диск в READ
+                self.victoria_states[drive_idx] = "READ"
+                print(f"Started autoread for {drive_idx}")
+                # self.log_action(f"Victoria READ started for [{drive_idx}]")
+                self.start_victoria_script("R", single_drive=drive_idx)
+                
+                break
+            time.sleep(1)
+
+        while self.victoria_states.get(drive_idx) == "READ":
+
+            perc_value = self._get_current_percentage(drive_idx)
+
+            if perc_value >= 100.0:
+                time.sleep(5)
+                # переключаем этот диск в READ
+                self.victoria_states[drive_idx] = "VERIFY"
+                print(f"Started autoread for {drive_idx}")
+                # self.log_action(f"Victoria Verify started for [{drive_idx}]")
+                self.start_victoria_script("V", single_drive=drive_idx)
+                break
+            time.sleep(1)
+
+        
     # ------------- SCSI sleep / Eject -------------
     def eject_device(self) -> None:
         selected_indices = self.gather_indices()
