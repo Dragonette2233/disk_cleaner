@@ -264,7 +264,7 @@ class DiskApp(QWidget):
         super().__init__()
         VERSION = open("appversion").read()
         self.setWindowTitle("Storage-Handler v" + VERSION)
-        self.setMinimumSize(750, 390)
+        self.setMinimumSize(850, 410)
         self.setWindowIcon(QIcon("hddc.ico"))
 
         # UI state containers
