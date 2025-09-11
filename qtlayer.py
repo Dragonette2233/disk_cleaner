@@ -37,7 +37,7 @@ from PyQt5.QtWidgets import (
 )
 
 from victoria.percentage import get_percentage
-from victoria.ui import cycle_victoria_script
+from victoria.ui import cycle_victoria_script, run_victoria_script as singlerun_victoria_script
 from victoria_open_ctypes import VICTORIA_PATH, CONFIG_PATH  # noqa: F401  (CONFIG_PATH is used externally)
 import victoria_open_ctypes
 from scsi_start_stop_unit import scsi_sleep_command, is_disk_sleeping
@@ -697,7 +697,7 @@ class DiskApp(QWidget):
                 self.victoria_states[drive_idx] = "READ"
                 print(f"Started autoread for {drive_idx}")
                 # self.log_action(f"Victoria READ started for [{drive_idx}]")
-                self.start_victoria_script("R", single_drive=drive_idx)
+                singlerun_victoria_script("R", single_drive=drive_idx)
                 
                 break
             time.sleep(1)
@@ -712,7 +712,7 @@ class DiskApp(QWidget):
                 self.victoria_states[drive_idx] = "VERIFY"
                 print(f"Started autoread for {drive_idx}")
                 # self.log_action(f"Victoria Verify started for [{drive_idx}]")
-                self.start_victoria_script("V", single_drive=drive_idx)
+                singlerun_victoria_script("V", single_drive=drive_idx)
                 break
             time.sleep(1)
 
