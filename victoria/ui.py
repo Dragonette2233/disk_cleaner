@@ -234,6 +234,7 @@ def run_victoria_script(drive_id: int, method: str):
     
     # scan_hwnd = find_control("TRzBitBtn", "Scan")
     if method != "W":
+        # print(method)
         while not find_control("TRzBitBtn", "Scan"):
             refresh_elements()
             print("Waiting for scan button")
