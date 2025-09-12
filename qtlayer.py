@@ -720,9 +720,9 @@ class DiskApp(QWidget):
             perc_value = self._get_current_percentage(drive_idx)
 
             if perc_value >= 100.0:
-                while self._get_current_percentage(drive_idx) == 100.0:
-                    print(f"{drive_idx} - Waiting for dropdown percentage after Read")
-                    time.sleep(2)
+                # while self._get_current_percentage(drive_idx) == 100.0:
+                #     print(f"{drive_idx} - Waiting for dropdown percentage after Read")
+                #     time.sleep(2)
                 # переключаем этот диск в READ
                 self.victoria_states[drive_idx] = "VERIFY"
                 singlerun_victoria_script(drive_id=drive_idx, method='V')
