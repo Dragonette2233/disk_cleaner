@@ -160,7 +160,8 @@ def eject_device(drive_index):
         0      # Зарезервировано
     )
     if result == 0:
-        print(f"Устройство PhysicalDrive{drive_index} успешно отключено от системы.")
+        ...
+        # print(f"Устройство PhysicalDrive{drive_index} успешно отключено от системы.")
     else:
         raise ctypes.WinError(result)
 
@@ -196,12 +197,14 @@ def get_disk_info(disk_index):
     kernel32.CloseHandle(handle)
 
     if not result:
-        print(f"Failed to get disk info for disk {disk_index}. Error: {ctypes.get_last_error()}")
+        ...
+        # print(f"Failed to get disk info for disk {disk_index}. Error: {ctypes.get_last_error()}")
 
         if ctypes.get_last_error() == 55:
             return 'OUT'
         else:
-            print(ctypes.get_last_error())
+            ...
+            # print(ctypes.get_last_error())
             return 'OUT'
 
     # Извлекаем информацию о модели и серийнике из буфера

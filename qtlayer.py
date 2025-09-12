@@ -18,7 +18,6 @@ import threading
 from datetime import datetime
 from functools import partial
 from typing import Iterable, List, Optional, Sequence, Tuple
-
 from PyQt5.QtCore import QTimer, Qt, QPoint
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
@@ -40,7 +39,8 @@ from victoria.percentage import get_percentage
 from victoria.ui import cycle_victoria_script, run_victoria_script as singlerun_victoria_script
 from victoria_open_ctypes import VICTORIA_PATH, CONFIG_PATH  # noqa: F401  (CONFIG_PATH is used externally)
 import victoria_open_ctypes
-from scsi_start_stop_unit import scsi_sleep_command, is_disk_sleeping
+from scsi_commands.scsi_start_stop_unit import scsi_sleep_command, is_disk_sleeping
+from scsi_commands.rescan import rescan_scsi_bus
 import smart_check
 import diskutils as du
 
@@ -291,6 +291,7 @@ class DiskApp(QWidget):
 
         self.cleard_button = QPushButton("DP Clear DEFAULT")
         self.clearr_button = QPushButton("DP Clear RESCAN")
+        self.rescan_scsi_device_button = QPushButton("SCSI Device Rescan")
         self.eject_button = QPushButton("Sleep (SCSI)")
         self.victoria_open_button = QPushButton("Victoria (open)")
         self.victoria_write_button = QPushButton("Victoria (WRITE)")
@@ -302,6 +303,7 @@ class DiskApp(QWidget):
         # Wire up actions
         self.cleard_button.clicked.connect(self.clear_default)
         self.clearr_button.clicked.connect(self.clear_rescan)
+        self.rescan_scsi_device_button.clicked.connect(self.scsi_rescan_devices)
         self.eject_button.clicked.connect(self.eject_device)
         self.victoria_open_button.clicked.connect(partial(self.victoria_open, 1))
         self.victoria_write_button.clicked.connect(partial(self.start_victoria_script, "W"))
@@ -313,6 +315,7 @@ class DiskApp(QWidget):
         clear_layout = QHBoxLayout()
         clear_layout.addWidget(self.cleard_button)
         clear_layout.addWidget(self.clearr_button)
+        clear_layout.addWidget(self.rescan_scsi_device_button)
 
         victoria_layout = QHBoxLayout()
         victoria_layout.addWidget(self.victoria_open_button)
@@ -324,11 +327,15 @@ class DiskApp(QWidget):
         smart_layout.addWidget(self.pushsmart_button)
         # smart_layout.addWidget(self.clearsmart_button)
 
+        
+
         self.main_layout.addLayout(clear_layout)
         self.main_layout.addLayout(victoria_layout)
         self.main_layout.addLayout(smart_layout)
         self.main_layout.addWidget(self.eject_button)
         self.setLayout(self.main_layout)
+
+        
 
         self.setStyleSheet(STYLE_APP)
         self.resize(550, 340)
@@ -355,9 +362,6 @@ class DiskApp(QWidget):
         self.sleep_thr_timer = QTimer(); self.sleep_thr_timer.timeout.connect(self.scsi_sleep_activity)
         self.smart_thread: Optional[threading.Thread] = None
         self.smart_thr_timer = QTimer(); self.smart_thr_timer.timeout.connect(self.smart_activity)
-        print('bbom')
-        # self.victoria_thread = Optional[threading.Thread] = None
-        print('bbom')
         
 
         # VICTORIA WRV STATE
@@ -659,7 +663,8 @@ class DiskApp(QWidget):
         # for idx in selected_indices:
         for i in selected_indices: 
             if "Not connected" in self.disk_labels["model"][i].text():
-                print('no disk in', i)
+                ...
+                # print('no disk in', i)
                 continue
             self.victoria_states[i] = "WRITE"
             threading.Thread(
@@ -695,7 +700,7 @@ class DiskApp(QWidget):
                 self.disk_labels["percentage"][drive_idx].setText("-%")
                 # переключаем этот диск в READ
                 self.victoria_states[drive_idx] = "READ"
-                print(f"Started autoread for {drive_idx}")
+                # print(f"Started autoread for {drive_idx}")
                 # self.log_action(f"Victoria READ started for [{drive_idx}]")
                 singlerun_victoria_script("R", drive_id=drive_idx)
                 
@@ -710,13 +715,19 @@ class DiskApp(QWidget):
                 time.sleep(5)
                 # переключаем этот диск в READ
                 self.victoria_states[drive_idx] = "VERIFY"
-                print(f"Started autoread for {drive_idx}")
+                # print(f"Started autoread for {drive_idx}")
                 # self.log_action(f"Victoria Verify started for [{drive_idx}]")
                 singlerun_victoria_script("V", drive_id=drive_idx)
                 break
             time.sleep(1)
 
-        
+    def scsi_rescan_devices(self):
+
+        result = rescan_scsi_bus()
+
+        if result.startswith("ERR"):
+            self.log_action(result)
+
     # ------------- SCSI sleep / Eject -------------
     def eject_device(self) -> None:
         selected_indices = self.gather_indices()
