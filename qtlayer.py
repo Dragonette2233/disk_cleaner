@@ -696,30 +696,38 @@ class DiskApp(QWidget):
             perc_value = self._get_current_percentage(drive_idx)
 
             if perc_value >= 100.0:
-                time.sleep(5)
-                self.disk_labels["percentage"][drive_idx].setText("-%")
+                # print(f"Write done for {drive_idx}. Cooldown 20s")
+                # time.sleep(20)
+                # self.disk_labels["percentage"][drive_idx].setText("-%")
                 # переключаем этот диск в READ
                 self.victoria_states[drive_idx] = "READ"
                 # print(f"Started autoread for {drive_idx}")
                 # self.log_action(f"Victoria READ started for [{drive_idx}]")
-                singlerun_victoria_script("R", drive_id=drive_idx)
+                singlerun_victoria_script(drive_id=drive_idx, method="R")
                 
                 break
-            time.sleep(1)
+            time.sleep(5)
+
+        while self._get_current_percentage(drive_idx) == 100.0:
+            print(f"{drive_idx} - Waiting for dropdown percentage after Write")
+            time.sleep(2)
+
+        # print(f"[{drive_idx}] timeout 15s between W and R")
+        # time.sleep(15)
 
         while self.victoria_states.get(drive_idx) == "READ":
 
             perc_value = self._get_current_percentage(drive_idx)
 
             if perc_value >= 100.0:
-                time.sleep(5)
+                while self._get_current_percentage(drive_idx) == 100.0:
+                    print(f"{drive_idx} - Waiting for dropdown percentage after Read")
+                    time.sleep(2)
                 # переключаем этот диск в READ
                 self.victoria_states[drive_idx] = "VERIFY"
-                # print(f"Started autoread for {drive_idx}")
-                # self.log_action(f"Victoria Verify started for [{drive_idx}]")
-                singlerun_victoria_script("V", drive_id=drive_idx)
+                singlerun_victoria_script(drive_id=drive_idx, method='V')
                 break
-            time.sleep(1)
+            time.sleep(5)
 
     def scsi_rescan_devices(self):
 
