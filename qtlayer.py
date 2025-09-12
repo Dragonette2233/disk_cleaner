@@ -697,7 +697,7 @@ class DiskApp(QWidget):
                 self.victoria_states[drive_idx] = "READ"
                 print(f"Started autoread for {drive_idx}")
                 # self.log_action(f"Victoria READ started for [{drive_idx}]")
-                singlerun_victoria_script("R", single_drive=drive_idx)
+                singlerun_victoria_script("R", drive_id=drive_idx)
                 
                 break
             time.sleep(1)
@@ -712,7 +712,7 @@ class DiskApp(QWidget):
                 self.victoria_states[drive_idx] = "VERIFY"
                 print(f"Started autoread for {drive_idx}")
                 # self.log_action(f"Victoria Verify started for [{drive_idx}]")
-                singlerun_victoria_script("V", single_drive=drive_idx)
+                singlerun_victoria_script("V", drive_id=drive_idx)
                 break
             time.sleep(1)
 
