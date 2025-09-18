@@ -37,26 +37,31 @@ def get_sas_smart(disk_num, strings, timeout=4):
 
     read_e = errors['read']
     write_e = errors['write']
+    verify_e = errors.get("verify")
 
-    r_corr = read_e['total_errors_corrected']
+    # r_corr = read_e['total_errors_corrected']
     r_uncorr = read_e['total_uncorrected_errors']
-    w_corr = write_e['total_errors_corrected']
+    # w_corr = write_e['total_errors_corrected']
     w_uncorr = write_e['total_uncorrected_errors']
+    # v_corr = write_e['total_errors_corrected']
+    if verify_e:
+        v_uncorr = verify_e['total_uncorrected_errors']
+    else:
+        v_uncorr = 0
 
     try:
         power_on_time = strings.get('power_on_time').get('hours')
     except AttributeError:
         power_on_time = '? '
 
-    log_short = f"wu{w_uncorr}ru{r_uncorr}"
+    log_short = f"w{w_uncorr}r{r_uncorr}v{v_uncorr}"
     log_complex = [
         f"Power on hours - {power_on_time}h",
-        "Read/Write Errors",
+        "Uncorrectable Errors",
         "-----------------",
-        f"Write Uncorrected - {w_uncorr}",
-        f"Read Uncorrected - {r_uncorr}",
-        f"Write Corrected - {w_corr}",
-        f"Read Corrected - {r_corr}",   
+        f"Write - {w_uncorr}",
+        f"Read  - {r_uncorr}",
+        f"Verify - {v_uncorr}",   
     ]
 
     if status == 8 or strings["smart_status"]["passed"] is False:

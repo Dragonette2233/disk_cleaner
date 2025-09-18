@@ -570,8 +570,9 @@ class DiskApp(QWidget):
             if inf:
                 self.disk_labels["smart_data"][i].setText(inf)
                 self.disk_labels["smart_data"][i].d_update(inf2)
-                if inf.startswith("wu"):
-                    no_errors = inf.replace("wu", "_").replace("ru", "_") == "_0_0"
+                if inf.startswith("w"):
+                    no_errors = inf == "w0r0v0"
+                    # no_errors = inf.replace("w", "_").replace("r", "_").replace("v", "_") == "_0_0_0"
                     self.disk_labels["smart_data"][i].setStyleSheet(f"color: {COLOR_WHITE if no_errors else COLOR_YELLOW};")
                     if "malfunction" in inf2:
                         self.disk_labels["smart_data"][i].setStyleSheet(f"color: {COLOR_ERROR};")
