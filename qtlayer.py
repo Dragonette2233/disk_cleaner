@@ -84,6 +84,7 @@ class ThreadData:
     """Holds data exchanged between worker thread(s) and UI thread."""
 
     def __init__(self) -> None:
+        self.victoria_scan_type: List[str] = [""] * MAX_DISKS
         self.connected_drives: int = 0
         self.disk_info: List[Tuple[int, str, str, str, bool, Optional[int]]] = []
         self.cache_part_sequence: str = ""
@@ -105,7 +106,12 @@ class ThreadData:
 
         for i in range(MAX_DISKS):
             info = du.get_disk_info(i)
+            
+            scan_status = self.victoria_scan_type[i]
             percentage = get_percentage(i)
+
+            if scan_status in ("W", "R", "V"):
+                percentage = f"({scan_status}) " + str(percentage)
 
             if info == "OUT":
                 self.disk_info.append((i, "! Disconnected !", "", "UL", False, percentage))
@@ -367,7 +373,7 @@ class DiskApp(QWidget):
         # VICTORIA WRV STATE
 
         self.victoria_states: dict[int, str] = {}  # ключ = номер диска, значение = "IDLE" | "WRITE" | "READ"
-        self.victoria_monitor_thread: Optional[threading.Thread] = None
+        # self.victoria_monitor_thread: Optional[threading.Thread] = None
 
         
     # from datetime import datetime
@@ -668,6 +674,7 @@ class DiskApp(QWidget):
                 # print('no disk in', i)
                 continue
             self.victoria_states[i] = "WRITE"
+            self.thread_data.victoria_scan_type[i] = "W"
             threading.Thread(
                 target=self._monitor_single_drive,
                 args=(i,),
@@ -682,10 +689,12 @@ class DiskApp(QWidget):
     
     def _get_current_percentage(self, drive_idx):
         text = self.disk_labels["percentage"][drive_idx].text()
+
         if text.endswith("%"):
             try:
-                value = float(text.replace("%", ""))
-            except ValueError:
+                value = float(text.replace("%", "").split()[1])
+                print(value)
+            except (ValueError, IndexError):
                 value = 0
             
             return value
@@ -702,6 +711,7 @@ class DiskApp(QWidget):
                 # self.disk_labels["percentage"][drive_idx].setText("-%")
                 # переключаем этот диск в READ
                 self.victoria_states[drive_idx] = "READ"
+                self.thread_data.victoria_scan_type[drive_idx] = "R"
                 # print(f"Started autoread for {drive_idx}")
                 # self.log_action(f"Victoria READ started for [{drive_idx}]")
                 singlerun_victoria_script(drive_id=drive_idx, method="R")
@@ -726,6 +736,7 @@ class DiskApp(QWidget):
                 #     time.sleep(2)
                 # переключаем этот диск в READ
                 self.victoria_states[drive_idx] = "VERIFY"
+                self.thread_data.victoria_scan_type[drive_idx] = "V"
                 singlerun_victoria_script(drive_id=drive_idx, method='V')
                 break
             time.sleep(5)
