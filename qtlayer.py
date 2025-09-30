@@ -487,7 +487,7 @@ class DiskApp(QWidget):
             "Clear (Rescan)": lambda: self.clear_rescan(single_idx=idx),
             "Send sleep": lambda: threading.Thread(target=scsi_sleep_command, args=((idx,),), daemon=True).start(),
             "Copy": lambda: self.clipboard.setText(" ".join(lb.text().split()[1:]).strip()),
-            "SMART": lambda: self.clipboard.setText(" ".join(lb.text().split()[1:]).strip()),
+            "SMART": lambda: self.push_smart(idx),
         }
         for text in actions.keys():
             context_menu.addAction(text)
@@ -528,8 +528,12 @@ class DiskApp(QWidget):
         for i in self.disk_labels["smart_cache"]:
             i.d_reset("sm_cache")
 
-    def push_smart(self) -> None:
-        selected_indices = self.gather_indices()
+    def push_smart(self, single: list) -> None:
+        if single:
+            selected_indices = [single, ]
+        else:
+            selected_indices = self.gather_indices()
+
         if not selected_indices:
             return  # ничего не выбрано
 
