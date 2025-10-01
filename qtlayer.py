@@ -697,7 +697,7 @@ class DiskApp(QWidget):
         if text.endswith("%"):
             try:
                 value = float(text.replace("%", "").split()[1])
-                print(value)
+                # print(value)
             except (ValueError, IndexError):
                 value = 0
             
@@ -724,7 +724,7 @@ class DiskApp(QWidget):
             time.sleep(5)
 
         while self._get_current_percentage(drive_idx) == 100.0:
-            print(f"{drive_idx} - Waiting for dropdown percentage after Write")
+            # print(f"{drive_idx} - Waiting for dropdown percentage after Write")
             time.sleep(2)
 
         # print(f"[{drive_idx}] timeout 15s between W and R")

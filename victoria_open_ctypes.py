@@ -137,6 +137,7 @@ def victoria_run(connected):
             width, height = 800, 600  # Размер окна
             success = user32.MoveWindow(hwnd, x, y, width, height, True)
             if not success:
-                print(f"Не удалось переместить окно PID {proc.pid}, HWND {hwnd}")
+                ...
+                # print(f"Не удалось переместить окно PID {proc.pid}, HWND {hwnd}")
         else:
             print(f"Окно не найдено для процесса PID {proc.pid}")
