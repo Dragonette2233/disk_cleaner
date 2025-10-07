@@ -43,6 +43,7 @@ from scsi_commands.scsi_start_stop_unit import scsi_sleep_command, is_disk_sleep
 from scsi_commands.rescan import rescan_scsi_bus
 import smart_check
 import diskutils_new as du
+from diskutils_new import SEM_ERROS
 
 # =====================
 # Constants / Styling
@@ -617,7 +618,7 @@ class DiskApp(QWidget):
                 cclr = COLOR_YELLOW
             elif p_info == "NL" and not is_sleep:
                 cclr = COLOR_GREEN
-            elif p_info in {"CRC", "IO", "OUT"}:
+            elif p_info in SEM_ERROS:
                 model = model + f" ({p_info})"; cclr = COLOR_ORANGE
             elif is_sleep is True:
                 cclr = COLOR_PURPLE_SLEEP

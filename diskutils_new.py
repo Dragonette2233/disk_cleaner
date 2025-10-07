@@ -22,7 +22,8 @@ INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
 
 DISK_ERRORS = {
     "OK": 0,
-    "INVALID_FUNCTION": 1,
+    "INV_FUNC": 1,
+    "INV_ADRESS": 483,
     "CRC": 23,
     "NOT_READY": 21,
     "BAD_CMD": 22,
@@ -33,16 +34,7 @@ DISK_ERRORS = {
     "OUT": 55
 }
 
-SEM_ERROS = ("OK",
-    "INVALID_FUNCTION",
-    "CRC",
-    "NOT_READY",
-    "BAD_CMD",
-    "GEN_FAIL",
-    "IO",
-    "SM_TIMEOUT",
-    "DENIED",
-    "OUT")
+SEM_ERROS = DISK_ERRORS.keys()
 
 # SEM_ERROS = DISK_ERRORS.keys()
 
@@ -115,8 +107,10 @@ def map_last_error_to_tag(code: int) -> str:
     # print(DISK_ERRORS.values())
     # print(DISK_ERRORS.items())
     # exit(0)
+    # print(code)
     for err, i in DISK_ERRORS.items():
         if code == i:
+            print(err)
             return err
     
     return f"ERR_{code}"
