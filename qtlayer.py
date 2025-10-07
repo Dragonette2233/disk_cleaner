@@ -42,7 +42,7 @@ import victoria_open_ctypes
 from scsi_commands.scsi_start_stop_unit import scsi_sleep_command, is_disk_sleeping
 from scsi_commands.rescan import rescan_scsi_bus
 import smart_check
-import diskutils as du
+import diskutils_new as du
 
 # =====================
 # Constants / Styling
