@@ -40,10 +40,9 @@ from victoria.ui import cycle_victoria_script, run_victoria_script as singlerun_
 from victoria_open_ctypes import VICTORIA_PATH, CONFIG_PATH  # noqa: F401  (CONFIG_PATH is used externally)
 import victoria_open_ctypes
 from scsi_commands.scsi_start_stop_unit import scsi_sleep_command, is_disk_sleeping
-from scsi_commands.rescan import rescan_scsi_bus
 import smart_check
-import diskutils_new as du
-from diskutils_new import SEM_ERROS
+import diskutils as du
+from diskutils import SEM_ERROS
 
 # =====================
 # Constants / Styling
@@ -213,12 +212,6 @@ class mSmart(QLabel):
         self.setStyleSheet(f"color: {COLOR_INFO};")
         self.setText(f"[{msg}]")
 
-
-# class mSerial(QLabel):
-#     def __init__(self) -> None:
-#         super().__init__()
-#         self.setStyleSheet("color: #65FA48;")
-
 class mSerial(QLabel):
     def __init__(self) -> None:
         super().__init__()
@@ -298,31 +291,26 @@ class DiskApp(QWidget):
 
         self.cleard_button = QPushButton("DP Clear DEFAULT")
         self.clearr_button = QPushButton("DP Clear RESCAN")
-        self.rescan_scsi_device_button = QPushButton("SCSI Device Rescan")
         self.eject_button = QPushButton("Sleep (SCSI)")
         self.victoria_open_button = QPushButton("Victoria (open)")
         self.victoria_write_button = QPushButton("Victoria (WRITE)")
         self.victoria_read_button = QPushButton("Victoria (READ)")
         self.victoria_autowr_button = QPushButton("Victoria (W-R-V)")
         self.pushsmart_button = QPushButton("Get SMART (smartctl)")
-        # self.clearsmart_button = QPushButton("Clear SMART cache")
 
         # Wire up actions
         self.cleard_button.clicked.connect(self.clear_default)
         self.clearr_button.clicked.connect(self.clear_rescan)
-        self.rescan_scsi_device_button.clicked.connect(self.scsi_rescan_devices)
         self.eject_button.clicked.connect(self.eject_device)
-        self.victoria_open_button.clicked.connect(partial(self.victoria_open, 1))
+        self.victoria_open_button.clicked.connect(self.victoria_open)
         self.victoria_write_button.clicked.connect(partial(self.start_victoria_script, "W"))
         self.victoria_read_button.clicked.connect(partial(self.start_victoria_script, "R"))
         self.victoria_autowr_button.clicked.connect(self.start_victoria_autowrite)
         self.pushsmart_button.clicked.connect(self.push_smart)
-        # self.clearsmart_button.clicked.connect(self.clear_smart_cache)
 
         clear_layout = QHBoxLayout()
         clear_layout.addWidget(self.cleard_button)
         clear_layout.addWidget(self.clearr_button)
-        clear_layout.addWidget(self.rescan_scsi_device_button)
 
         victoria_layout = QHBoxLayout()
         victoria_layout.addWidget(self.victoria_open_button)
@@ -332,9 +320,7 @@ class DiskApp(QWidget):
 
         smart_layout = QHBoxLayout()
         smart_layout.addWidget(self.pushsmart_button)
-        # smart_layout.addWidget(self.clearsmart_button)
 
-        
 
         self.main_layout.addLayout(clear_layout)
         self.main_layout.addLayout(victoria_layout)
@@ -374,9 +360,7 @@ class DiskApp(QWidget):
         # VICTORIA WRV STATE
 
         self.victoria_states: dict[int, str] = {}  # ключ = номер диска, значение = "IDLE" | "WRITE" | "READ"
-        # self.victoria_monitor_thread: Optional[threading.Thread] = None
 
-        
     # from datetime import datetime
 
     def _set_label_bg(self, label: QLabel, bg: str) -> None:
@@ -384,21 +368,49 @@ class DiskApp(QWidget):
         base = self.debug_label.styleSheet().rstrip("; ")
         label.setStyleSheet(f"{base}; background-color: {bg};")
 
-    def log_action(self, action: str, processing=False) -> None:
+    # def log_action(self, action: str, processing=False) -> None:
         
     
-        """Записывает последнюю операцию в debug_label с текущим временем."""
-
-
+    def log_action(self, action: str, processing: bool = False) -> None:
+        """Записывает последнюю операцию в debug_label с текущим временем.
+        Одновременно отключает все кнопки на 1000 мс.
+        """
+         # Подсветка надписи
         if not processing:
             self._set_label_bg(self.debug_label, HL_GREEN_BG)
             QTimer.singleShot(1000, lambda: self._set_label_bg(self.debug_label, HL_GREY_BG))
         else:
             self._set_label_bg(self.debug_label, HL_YELLOW_BG)
 
+        # Список кнопок
+        all_buttons: list[QPushButton] = [
+            self.cleard_button,
+            self.clearr_button,
+            self.eject_button,
+            self.victoria_open_button,
+            self.victoria_write_button,
+            self.victoria_read_button,
+            self.victoria_autowr_button,
+            self.pushsmart_button,
+        ]
+
+        # Отключаем и меняем стиль
+        for b in all_buttons:
+            b.setDisabled(True)
+            b.setStyleSheet("color: #aaa;")
+
+        # Восстановление
+        def reenable_buttons():
+            for b in all_buttons:
+                b.setDisabled(False)
+                b.setStyleSheet("")  # сброс к дефолтному стилю
+
+        QTimer.singleShot(1000, reenable_buttons)
+
+        # Текст + время
         now = datetime.now().strftime("%H:%M:%S")
-        # self.debug_label.setStyleSheet()
         self.debug_label.setText(f"Last Action: {action} [{now}]")
+
 
  
     # ------------- helpers -------------
@@ -409,7 +421,7 @@ class DiskApp(QWidget):
         btn.setDisabled(False)
 
     # ------------- external actions -------------
-    def victoria_open(self, connected: int = 8) -> None:  # API preserved
+    def victoria_open(self) -> None:  # API preserved
         # Determine indices of actually connected/usable disks
         l = [
             i
@@ -438,8 +450,12 @@ class DiskApp(QWidget):
                 except Exception as e:
                     QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить путь: {e}")
         else:
-            # Fire-and-forget start via ctypes wrapper
-            threading.Thread(target=victoria_open_ctypes.victoria_run, args=(tuple(l),), daemon=True).start()
+
+            if len(l) == 0:
+                self.log_action(action="No avaliable disks for Victoria")
+            else:
+                self.log_action(f"Opening victoria for {l}")
+                threading.Thread(target=victoria_open_ctypes.victoria_run, args=(tuple(l),), daemon=True).start()
 
     def clearing_activity(self) -> None:
         if self.clearing_thread and not self.clearing_thread.is_alive():
@@ -552,13 +568,6 @@ class DiskApp(QWidget):
         smarts = smart_check.get_short_smarts(indices)
         self.thread_data.smart_queue.put(smarts)
 
-    # def smart_activity(self) -> None:
-    #     if self.smart_thread and not self.smart_thread.is_alive():
-    #         self.smart_thr_timer.stop()
-    #         self.log_action("Smart UPDATED")
-    #         self._set_button_idle(self.pushsmart_button)
-
-
     def refresh_smart_info(self) -> None:
         try:
             short_sm, complex_sm = self.thread_data.smart_queue.get_nowait()
@@ -645,9 +654,6 @@ class DiskApp(QWidget):
     # ------------- Victoria scripts -------------
     def start_victoria_script(self, method: str, single_drive=0) -> None:
 
-        # if single_drive:
-        #     selected_indices = [single_drive, ]
-        # else:
         selected_indices = self.gather_indices()
 
 
@@ -659,7 +665,6 @@ class DiskApp(QWidget):
                 args=(selected_indices,),
                 daemon=True,
             ).start()
-            # self.victoria_state = "WRITE"
             
 
     
@@ -675,8 +680,6 @@ class DiskApp(QWidget):
         # for idx in selected_indices:
         for i in selected_indices: 
             if "Not connected" in self.disk_labels["model"][i].text():
-                ...
-                # print('no disk in', i)
                 continue
             self.victoria_states[i] = "WRITE"
             self.thread_data.victoria_scan_type[i] = "W"
@@ -685,13 +688,9 @@ class DiskApp(QWidget):
                 args=(i,),
                 daemon=True,
             ).start()
-        # self.victoria_states[idx] = "WRITE"
-        # self.log_action(f"Victoria WRITE started for [{selected_indices}]")
+
         self.start_victoria_script("W")
 
-        # print(f"Started autowrite for: {idx}")
-        
-    
     def _get_current_percentage(self, drive_idx):
         text = self.disk_labels["percentage"][drive_idx].text()
 
@@ -705,53 +704,34 @@ class DiskApp(QWidget):
             return value
 
     def _monitor_single_drive(self, drive_idx: int) -> None:
-        # def _monitor_single_drive(self, drive_idx: int) -> None:
+
         while self.victoria_states.get(drive_idx) == "WRITE":
             
             perc_value = self._get_current_percentage(drive_idx)
 
             if perc_value >= 100.0:
-                # print(f"Write done for {drive_idx}. Cooldown 20s")
-                # time.sleep(20)
-                # self.disk_labels["percentage"][drive_idx].setText("-%")
                 # переключаем этот диск в READ
                 self.victoria_states[drive_idx] = "READ"
                 self.thread_data.victoria_scan_type[drive_idx] = "R"
-                # print(f"Started autoread for {drive_idx}")
-                # self.log_action(f"Victoria READ started for [{drive_idx}]")
                 singlerun_victoria_script(drive_id=drive_idx, method="R")
                 
                 break
             time.sleep(5)
 
         while self._get_current_percentage(drive_idx) == 100.0:
-            # print(f"{drive_idx} - Waiting for dropdown percentage after Write")
             time.sleep(2)
-
-        # print(f"[{drive_idx}] timeout 15s between W and R")
-        # time.sleep(15)
 
         while self.victoria_states.get(drive_idx) == "READ":
 
             perc_value = self._get_current_percentage(drive_idx)
 
             if perc_value >= 100.0:
-                # while self._get_current_percentage(drive_idx) == 100.0:
-                #     print(f"{drive_idx} - Waiting for dropdown percentage after Read")
-                #     time.sleep(2)
                 # переключаем этот диск в READ
                 self.victoria_states[drive_idx] = "VERIFY"
                 self.thread_data.victoria_scan_type[drive_idx] = "V"
                 singlerun_victoria_script(drive_id=drive_idx, method='V')
                 break
             time.sleep(5)
-
-    def scsi_rescan_devices(self):
-
-        result = rescan_scsi_bus()
-
-        if result.startswith("ERR"):
-            self.log_action(result)
 
     # ------------- SCSI sleep / Eject -------------
     def eject_device(self) -> None:
@@ -796,11 +776,3 @@ class DiskApp(QWidget):
             self.log_action(action=f"Clearing {selected_indices}", processing=True)
             self._set_button_busy(self.cleard_button)
             self._set_button_busy(self.clearr_button)
-            # self.clearr_button.setDisabled(True)
-
-
-# # =====================
-# # Entrypoint
-# # =====================
-# if __name__ == "__main__":
-    
