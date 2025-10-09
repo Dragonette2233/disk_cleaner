@@ -293,9 +293,15 @@ class DiskApp(QWidget):
         self.clearr_button = QPushButton("DP Clear RESCAN")
         self.eject_button = QPushButton("Sleep (SCSI)")
         self.victoria_open_button = QPushButton("Victoria (open)")
-        self.victoria_write_button = QPushButton("Victoria (WRITE)")
-        self.victoria_read_button = QPushButton("Victoria (READ)")
-        self.victoria_autowr_button = QPushButton("Victoria (W-R-V)")
+        self.victoria_menu_button = QPushButton("Victoria (test)")
+        vict_menu = QMenu(self)
+        vict_menu.addAction("Read",  lambda: self.start_victoria_script("R"))
+        vict_menu.addAction("Write", lambda: self.start_victoria_script("W"))
+        vict_menu.addAction("W-R-V", self.start_victoria_autowrite)
+        self.victoria_menu_button.setMenu(vict_menu)
+        # self.victoria_write_button = QPushButton("Victoria (WRITE)")
+        # self.victoria_read_button = QPushButton("Victoria (READ)")
+        # self.victoria_autowr_button = QPushButton("Victoria (W-R-V)")
         self.pushsmart_button = QPushButton("Get SMART (smartctl)")
 
         # Wire up actions
@@ -303,9 +309,9 @@ class DiskApp(QWidget):
         self.clearr_button.clicked.connect(self.clear_rescan)
         self.eject_button.clicked.connect(self.eject_device)
         self.victoria_open_button.clicked.connect(self.victoria_open)
-        self.victoria_write_button.clicked.connect(partial(self.start_victoria_script, "W"))
-        self.victoria_read_button.clicked.connect(partial(self.start_victoria_script, "R"))
-        self.victoria_autowr_button.clicked.connect(self.start_victoria_autowrite)
+        # self.victoria_write_button.clicked.connect(partial(self.start_victoria_script, "W"))
+        # self.victoria_read_button.clicked.connect(partial(self.start_victoria_script, "R"))
+        # self.victoria_autowr_button.clicked.connect(self.start_victoria_autowrite)
         self.pushsmart_button.clicked.connect(self.push_smart)
 
         clear_layout = QHBoxLayout()
@@ -314,9 +320,10 @@ class DiskApp(QWidget):
 
         victoria_layout = QHBoxLayout()
         victoria_layout.addWidget(self.victoria_open_button)
-        victoria_layout.addWidget(self.victoria_write_button)
-        victoria_layout.addWidget(self.victoria_read_button)
-        victoria_layout.addWidget(self.victoria_autowr_button)
+        victoria_layout.addWidget(self.victoria_menu_button)
+        # victoria_layout.addWidget(self.victoria_write_button)
+        # victoria_layout.addWidget(self.victoria_read_button)
+        # victoria_layout.addWidget(self.victoria_autowr_button)
 
         smart_layout = QHBoxLayout()
         smart_layout.addWidget(self.pushsmart_button)
@@ -388,9 +395,7 @@ class DiskApp(QWidget):
             self.clearr_button,
             self.eject_button,
             self.victoria_open_button,
-            self.victoria_write_button,
-            self.victoria_read_button,
-            self.victoria_autowr_button,
+            self.victoria_menu_button,
             self.pushsmart_button,
         ]
 
@@ -670,7 +675,8 @@ class DiskApp(QWidget):
     
     def start_victoria_autowrite(self) -> None:
 
-        self.log_action(f"Started autowrite")
+        
+        empty_slots = 0
 
         selected_indices = self.gather_indices()
         if not selected_indices:
@@ -680,6 +686,7 @@ class DiskApp(QWidget):
         # for idx in selected_indices:
         for i in selected_indices: 
             if "Not connected" in self.disk_labels["model"][i].text():
+                empty_slots += 1
                 continue
             self.victoria_states[i] = "WRITE"
             self.thread_data.victoria_scan_type[i] = "W"
@@ -688,6 +695,9 @@ class DiskApp(QWidget):
                 args=(i,),
                 daemon=True,
             ).start()
+
+        if empty_slots == 9:
+            self.log_action("No avaliable disks for Victoria")
 
         self.start_victoria_script("W")
 
@@ -748,7 +758,7 @@ class DiskApp(QWidget):
     # ------------- Clear partitions -------------
     def clear_rescan(self, single_idx: bool | int = False) -> None:
         selected_indices: Optional[Sequence[int]] = self.gather_indices()
-        if isinstance(single_idx, int) and single_idx in range(MAX_DISKS):
+        if isinstance(single_idx, int) and single_idx in range(1, MAX_DISKS):
             selected_indices = (single_idx,)
         if selected_indices:
             self.clearing_thread = threading.Thread(
@@ -758,8 +768,9 @@ class DiskApp(QWidget):
             )
             self.clearing_thread.start()
             self.clr_thr_timer.start(200)
-            self._set_button_busy(self.clearr_button)
-            self.cleard_button.setDisabled(True)
+            self.log_action(action=f"Clearing (rescan) {selected_indices}", processing=True)
+            # self._set_button_busy(self.clearr_button)
+            # self.cleard_button.setDisabled(True)
 
     def clear_default(self, single_idx: bool | int = False) -> None:
         selected_indices: Optional[Sequence[int]] = self.gather_indices()
@@ -774,5 +785,5 @@ class DiskApp(QWidget):
             self.clearing_thread.start()
             self.clr_thr_timer.start(200)
             self.log_action(action=f"Clearing {selected_indices}", processing=True)
-            self._set_button_busy(self.cleard_button)
-            self._set_button_busy(self.clearr_button)
+            # self._set_button_busy(self.cleard_button)
+            # self._set_button_busy(self.clearr_button)
